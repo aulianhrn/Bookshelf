@@ -34,39 +34,64 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final user = await SupabaseService.instance.login(
-        email: email,
-        password: password,
+      final userService = userser();
+      final result = await userService.login(email, password);
+
+      if (result == null) {
+        throw Exception('Email atau password salah');
+      }
+
+      // Simpan nama user
+      final user = result['user'] as Map<String, dynamic>;
+
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('user_id', user['uuid']);
+      await prefs.setString('nama', user['nama']);
+      await prefs.setString('email', user['email']);
+
+      await UserService.saveCurrentUserName(user['nama']);
+
+      final token = result['token'] as String;
+
+      await AuthStorage.saveSession(
+        token: token,
+        expiredAt: DateTime.now().add(
+          const Duration(hours: 24),
+        ), //ganti jam disini
       );
 
-      if (!mounted) return;
+      final biometricVerified = await _showBiometricDialog();
 
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Email atau kata sandi salah")),
+      if (biometricVerified && mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigation()),
+          (route) => false,
         );
-        return;
+      }
+    } catch (e) {
+      String errorMessage = 'Terjadi kesalahan';
+
+      if (e.toString().contains('salah')) {
+        errorMessage = 'Email atau password salah';
+      } else if (e.toString().contains('SocketException')) {
+        errorMessage = 'Tidak bisa terhubung ke server';
+      } else {
+        errorMessage = e.toString();
       }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Selamat datang, ${user.username}")),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Login gagal: $error")));
-    } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
