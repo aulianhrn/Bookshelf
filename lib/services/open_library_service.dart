@@ -1,7 +1,5 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
-
 import '../models/open_library_book.dart';
 
 class OpenLibraryService {
@@ -55,5 +53,28 @@ class OpenLibraryService {
 
   Future<List<OpenLibraryBook>> getRecommendations() {
     return searchBooks(query: 'classic literature', limit: 10);
+  }
+
+  Future<String?> getBookDescription(String workKey) async {
+    // workKey dari search hasil adalah format "/works/OL27516W"
+    final path = workKey.startsWith('/works/')
+      ? '$workKey.json'
+      : '/works/$workKey.json';
+    final uri = Uri.https(_baseUrl, path);
+
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) return null;
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    final description = body['description'];
+
+    if (description is String) {
+      return description;
+    } else if (description is Map<String, dynamic>) {
+      return description['value'] as String?;
+    }
+
+    return null;
   }
 }

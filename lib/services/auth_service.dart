@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../models/app_user.dart';
 import 'session_service.dart';
 import 'supabase_service.dart';

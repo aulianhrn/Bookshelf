@@ -11,7 +11,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: 'https://ioibwzbdgkwkzpgvyyeh.supabase.co',
-    anonKey: 'ISI_ANON_KEY_KAMU',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvaWJ3emJkZ2t3a3pwZ3Z5eWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjUwMDcsImV4cCI6MjA5NTkwMTAwN30.n1C9nTt4IF55p3mtsA8iDq6aC31x7HHLmR72XRh99oU',
   );
 
   runApp(const MyApp());

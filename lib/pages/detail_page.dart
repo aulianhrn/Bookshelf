@@ -1,8 +1,11 @@
+import 'package:bookself_/services/review_service.dart';
+import 'package:bookself_/services/session_service.dart';
 import 'package:flutter/material.dart';
-
 import '../models/open_library_book.dart';
 import '../models/review.dart';
-import '../services/supabase_service.dart';
+import '../services/open_library_service.dart';
+import '../models/app_user.dart';
+import '../services/reading_list_service.dart';
 
 class DetailBookPage extends StatefulWidget {
   const DetailBookPage({
@@ -34,12 +37,88 @@ class DetailBookPage extends StatefulWidget {
 class _DetailBookPageState extends State<DetailBookPage> {
   bool expanded = false;
   bool isLoadingReviews = true;
+  bool isInReadingList = false;
+  bool isLoadingReadingList = false;
   List<Review> reviews = [];
+  AppUser? currentUser;
+  String? synopsis;
+  bool isLoadingSynopsis = false;
 
   @override
   void initState() {
     super.initState();
     loadReviews();
+    loadSynopsis();
+    _loadCurrentUser();
+    _loadCurrentUser().then((_) => checkReadingList());
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await SessionService.getCurrentUser();
+    if (mounted) setState(() => currentUser = user);
+  }
+
+  Future<void> checkReadingList() async {
+    if (currentUser == null) return;
+    final result = await ReadingListService().isInReadingList(
+      userId: currentUser!.id,
+      bookId: widget.effectiveBookId,
+    );
+    if (mounted) setState(() => isInReadingList = result);
+  }
+
+  Future<void> toggleReadingList() async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Silakan login terlebih dahulu")),
+      );
+      return;
+    }
+
+    setState(() => isLoadingReadingList = true);
+
+    try {
+      if (isInReadingList) {
+        await ReadingListService().removeFromReadingList(
+          userId: currentUser!.id,
+          bookId: widget.effectiveBookId,
+        );
+        if (mounted) setState(() => isInReadingList = false);
+      } else {
+        await ReadingListService().addToReadingList(
+          userId: currentUser!.id,
+          book: widget.book!,
+        );
+        if (mounted) setState(() => isInReadingList = true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => isLoadingReadingList = false);
+    }
+  }
+
+  Future<void> loadSynopsis() async {
+    final workKey = widget.book?.id; // id dari OpenLibraryBook adalah key-nya
+    if (workKey == null) return;
+
+    setState(() => isLoadingSynopsis = true);
+
+    try {
+      final result = await OpenLibraryService.instance.getBookDescription(
+        workKey,
+      );
+      if (!mounted) return;
+      setState(() => synopsis = result);
+    } catch (_) {
+      // Gagal ambil sinopsis, biarkan null — fallback ke teks default
+    } finally {
+      if (mounted) setState(() => isLoadingSynopsis = false);
+    }
   }
 
   Future<void> loadReviews() async {
@@ -48,7 +127,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
     });
 
     try {
-      final rows = await SupabaseService.instance.getReviewsByBook(
+      final rows = await ReviewService().getReviewsByBook(
         widget.effectiveBookId,
       );
       if (!mounted) return;
@@ -70,10 +149,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
   }
 
   Future<void> showReviewDialog() async {
-    final user = await SupabaseService.instance.getCurrentUser();
-    if (!mounted) return;
-
-    if (user == null) {
+    if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Silakan login untuk menulis review")),
       );
@@ -133,8 +209,8 @@ class _DetailBookPageState extends State<DetailBookPage> {
                 ElevatedButton(
                   onPressed: () async {
                     try {
-                      await SupabaseService.instance.createReview(
-                        userId: user.id,
+                      await ReviewService().createReview(
+                        userId: currentUser!.id,
                         bookId: widget.effectiveBookId,
                         bookTitle: widget.effectiveBookTitle,
                         rating: rating,
@@ -163,6 +239,97 @@ class _DetailBookPageState extends State<DetailBookPage> {
     );
 
     contentController.dispose();
+  }
+
+  Future<void> showEditReviewDialog(Review review) async {
+    final contentController = TextEditingController(text: review.content);
+    int selectedRating = review.rating;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text("Edit Review"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Bintang rating
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < selectedRating
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.amber,
+                        ),
+                        onPressed: () {
+                          setStateDialog(() => selectedRating = index + 1);
+                        },
+                      );
+                    }),
+                  ),
+                  TextField(
+                    controller: contentController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: "Isi review"),
+                  ),
+                ],
+              ),
+              actions: [
+                // Tombol hapus
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    try {
+                      await ReviewService().deleteReview(review.id);
+                      await loadReviews();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Gagal menghapus: $e")),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text(
+                    "Hapus",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Batal"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    try {
+                      await ReviewService().updateReview(
+                        id: review.id,
+                        rating: selectedRating,
+                        content: contentController.text,
+                      );
+                      await loadReviews();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Gagal mengupdate: $e")),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Simpan"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   double get averageRating {
@@ -275,31 +442,47 @@ class _DetailBookPageState extends State<DetailBookPage> {
               ],
             ),
             const SizedBox(height: 24),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.bookmark),
-                    label: const Text("Simpan"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff9E421E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                ElevatedButton.icon(
+                  onPressed: isLoadingReadingList ? null : toggleReadingList,
+                  icon: isLoadingReadingList
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          isInReadingList
+                              ? Icons.library_books
+                              : Icons.library_add,
+                        ),
+                  label: Text(
+                    isInReadingList
+                        ? "Hapus dari perpustakaan"
+                        : "Tambah ke perpustakaan",
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isInReadingList
+                        ? const Color(0xff9E421E)
+                        : const Color(0xff185FA5),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: showReviewDialog,
-                    icon: const Icon(Icons.rate_review),
-                    label: const Text("Review"),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xff031632),
-                      side: const BorderSide(color: Color(0xff031632)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: showReviewDialog,
+                  icon: const Icon(Icons.rate_review),
+                  label: const Text("Tulis Review"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xff031632),
+                    side: const BorderSide(color: Color(0xff031632)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ],
@@ -310,19 +493,28 @@ class _DetailBookPageState extends State<DetailBookPage> {
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            AnimatedCrossFade(
-              firstChild: const Text(
-                "Di jantung kota yang tak pernah tidur, seorang alkemis tua menyimpan rahasia yang dapat mengubah tatanan dunia. Novel ini mengikuti perjalanan seorang pemuda yang menemukan catatan kuno di sebuah perpustakaan terbengkalai...",
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-              ),
-              secondChild: const Text(
-                "Data buku diambil dari Open Library. Gunakan review pembaca di BookShelf untuk menyimpan catatan dan penilaian pribadi terhadap buku ini.",
-              ),
-              crossFadeState: expanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 300),
+            // Teks fallback jika API tidak punya sinopsis
+            Builder(
+              builder: (context) {
+                const fallback = "Sinopsis tidak tersedia untuk buku ini.";
+                final fullSynopsis = synopsis ?? fallback;
+                final shortSynopsis = fullSynopsis.length > 150
+                    ? '${fullSynopsis.substring(0, 150)}...'
+                    : fullSynopsis;
+
+                if (isLoadingSynopsis) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                return AnimatedCrossFade(
+                  firstChild: Text(shortSynopsis),
+                  secondChild: Text(fullSynopsis),
+                  crossFadeState: expanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 300),
+                );
+              },
             ),
             TextButton(
               onPressed: () {
@@ -343,7 +535,12 @@ class _DetailBookPageState extends State<DetailBookPage> {
             else if (reviews.isEmpty)
               const Text("Belum ada review untuk buku ini.")
             else
-              ...reviews.map(reviewCard),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: reviews.length,
+                itemBuilder: (context, index) => reviewCard(reviews[index]),
+              ),
           ],
         ),
       ),
@@ -352,6 +549,8 @@ class _DetailBookPageState extends State<DetailBookPage> {
 
   Widget reviewCard(Review review) {
     final name = review.username ?? "Pembaca";
+    // Cek apakah review ini milik user yang sedang login
+    final isOwner = currentUser?.id == review.userId;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -365,6 +564,13 @@ class _DetailBookPageState extends State<DetailBookPage> {
                 CircleAvatar(child: Text(name[0].toUpperCase())),
                 const SizedBox(width: 12),
                 Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                // ✅ Tampilkan tombol edit hanya jika milik sendiri
+                if (isOwner)
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    onPressed: () => showEditReviewDialog(review),
+                  ),
               ],
             ),
             const SizedBox(height: 10),

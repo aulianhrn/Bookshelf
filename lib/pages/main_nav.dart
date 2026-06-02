@@ -3,6 +3,8 @@ import 'package:bookself_/pages/home_page.dart';
 import 'package:bookself_/pages/profile_page.dart';
 import 'package:bookself_/pages/search_page.dart';
 import 'package:flutter/material.dart';
+import '../services/session_service.dart';
+import 'login_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -22,14 +24,12 @@ class _MainNavigationState extends State<MainNavigation> {
   ];
 
   Future<void> logout() async {
-    await AuthStorage.deleteSession();
+    await SessionService.logout();
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (_) => const LoginPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const LoginPage()),
         (route) => false,
       );
 

@@ -1,9 +1,9 @@
+import 'package:bookself_/services/session_service.dart';
 import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
 import '../models/open_library_book.dart';
 import '../services/open_library_service.dart';
-import '../services/supabase_service.dart';
 import 'collection_page.dart';
 import 'detail_page.dart';
 import 'login_page.dart';
@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> loadUser() async {
-    final user = await SupabaseService.instance.getCurrentUser();
+    final user = await SessionService.getCurrentUser();
     if (!mounted) return;
     setState(() {
       currentUser = user;
@@ -38,7 +38,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> logout() async {
-    await SupabaseService.instance.logout();
+    await SessionService.logout();
     if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
@@ -112,7 +112,7 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Selamat pagi, ${currentUser?.username ?? 'Pembaca'}",
+                "Selamat Datang, ${currentUser?.username ?? 'Pembaca'}!",
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,

@@ -1,7 +1,7 @@
+import 'package:bookself_/services/auth_service.dart';
 import 'package:flutter/material.dart';
-
-import '../services/supabase_service.dart';
 import 'home_page.dart';
+import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -48,7 +48,7 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      final user = await SupabaseService.instance.register(
+      final user = await AuthService().register(
         username: username,
         email: email,
         password: password,
@@ -58,12 +58,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const LoginPage()),
         (_) => false,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registrasi berhasil. Halo, ${user.username}")),
+        SnackBar(content: Text("Registrasi berhasil! Silahkan Login!")),
       );
     } catch (error) {
       if (!mounted) return;

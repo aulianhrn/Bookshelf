@@ -1,6 +1,5 @@
+import 'package:bookself_/services/auth_service.dart';
 import 'package:flutter/material.dart';
-
-import '../services/supabase_service.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
@@ -34,42 +33,21 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final userService = userser();
-      final result = await userService.login(email, password);
+      final result = await AuthService().login(
+        email: email,
+        password: password,
+      );
 
       if (result == null) {
         throw Exception('Email atau password salah');
       }
 
-      // Simpan nama user
-      final user = result['user'] as Map<String, dynamic>;
+      if (!mounted) return;
 
-      final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setString('user_id', user['uuid']);
-      await prefs.setString('nama', user['nama']);
-      await prefs.setString('email', user['email']);
-
-      await UserService.saveCurrentUserName(user['nama']);
-
-      final token = result['token'] as String;
-
-      await AuthStorage.saveSession(
-        token: token,
-        expiredAt: DateTime.now().add(
-          const Duration(hours: 24),
-        ), //ganti jam disini
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
       );
-
-      final biometricVerified = await _showBiometricDialog();
-
-      if (biometricVerified && mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-          (route) => false,
-        );
-      }
     } catch (e) {
       String errorMessage = 'Terjadi kesalahan';
 
