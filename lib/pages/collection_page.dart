@@ -5,715 +5,358 @@ import 'detail_page.dart';
 import '../models/app_user.dart';
 import '../services/reading_list_service.dart';
 
+const _bg        = Color(0xFFF4EAE1);
+const _blue      = Color(0xFF2563EB);
+const _blueDark  = Color(0xFF1E40AF);
+const _blueLight = Color(0xFFDBEAFE);
+const _ink       = Color(0xFF1E1B4B);
+const _muted     = Color(0xFF6B7280);
+const _green     = Color(0xFF059669);
+const _red       = Color(0xFFDC2626);
+const _amber     = Color(0xFFF59E0B);
+const _card      = Color(0xFFFFFFFF);
+
 class CollectionPage extends StatefulWidget {
   const CollectionPage({super.key});
-
   @override
   State<CollectionPage> createState() => _CollectionPageState();
 }
 
-class _CollectionPageState extends State<CollectionPage> {
-  bool isReading = true;
-  bool isLoadingReadingList = true;
-  List<Map<String, dynamic>> readingList = [];
+class _CollectionPageState extends State<CollectionPage>
+    with SingleTickerProviderStateMixin {
+  bool _isReading = true;
+  bool _loading   = true;
+  List<Map<String, dynamic>> readingList  = [];
   List<Map<String, dynamic>> finishedList = [];
   AppUser? currentUser;
+  late final TabController _tab;
 
   @override
   void initState() {
     super.initState();
+    _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(() => setState(() => _isReading = _tab.index == 0));
     _init();
   }
 
+  @override
+  void dispose() { _tab.dispose(); super.dispose(); }
+
   Future<void> _init() async {
-    final user = await SessionService.getCurrentUser();
-    if (mounted) setState(() => currentUser = user);
-    await Future.wait([loadReadingList()]);
+    final u = await SessionService.getCurrentUser();
+    if (mounted) setState(() => currentUser = u);
+    await _load();
   }
 
-  Future<void> loadReadingList() async {
+  Future<void> _load() async {
     if (currentUser == null) {
-      if (mounted) setState(() => isLoadingReadingList = false);
-      return;
+      if (mounted) setState(() => _loading = false); return;
     }
-
     try {
-      final reading = await ReadingListService().getReadingList(
-        userId: currentUser!.id,
-        isFinished: false,
-      );
-      final finished = await ReadingListService().getReadingList(
-        userId: currentUser!.id,
-        isFinished: true,
-      );
+      final r = await ReadingListService().getReadingList(
+          userId: currentUser!.id, isFinished: false);
+      final f = await ReadingListService().getReadingList(
+          userId: currentUser!.id, isFinished: true);
       if (!mounted) return;
-      setState(() {
-        readingList = reading;
-        finishedList = finished;
-      });
+      setState(() { readingList = r; finishedList = f; });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal memuat daftar bacaan: $e")),
-        );
-      }
+      if (mounted) _snack('Gagal memuat: $e');
     } finally {
-      if (mounted) setState(() => isLoadingReadingList = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> showRatingReviewSheet(Map<String, dynamic> book) async {
-    int selectedRating = book['user_rating'] ?? 0;
-    final contentController = TextEditingController();
+  void _snack(String msg) => ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
 
+  Future<void> _showRatingSheet(Map<String, dynamic> book) async {
+    int rating = book['user_rating'] ?? 0;
+    final ctrl = TextEditingController();
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateSheet) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, ss) => Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: EdgeInsets.only(
+              left: 20, right: 20, top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+          decoration: const BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.all(Radius.circular(28))),
+          child: Column(mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              if (book['cover_url'] != null)
+                ClipRRect(borderRadius: BorderRadius.circular(8),
+                  child: Image.network(book['cover_url'],
+                    width: 40, height: 52, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.book_rounded, color: _blue))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
-                  Row(
-                    children: [
-                      if (book['cover_url'] != null)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.network(
-                            book['cover_url'],
-                            width: 36,
-                            height: 46,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.book, size: 36),
-                          ),
-                        ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              book['book_title'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              book['book_author'] ?? '',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Bintang rating
-                  const Text("Rating kamu"),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: List.generate(5, (index) {
-                      return GestureDetector(
-                        onTap: () {
-                          setStateSheet(() => selectedRating = index + 1);
-                        },
-                        child: Icon(
-                          index < selectedRating
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: Colors.amber,
-                          size: 36,
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Input komentar
-                  const Text("Komentar (opsional)"),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: contentController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: "Tulis pendapatmu tentang buku ini...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Tombol simpan
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: selectedRating == 0
-                          ? null
-                          : () async {
-                              Navigator.pop(context);
-                              try {
-                                // Simpan rating ke reading_list
-                                await ReadingListService().updateUserRating(
-                                  id: book['id'],
-                                  rating: selectedRating,
-                                );
-
-                                // Simpan review ke tabel reviews
-                                await ReviewService().createReview(
-                                  userId: currentUser!.id,
-                                  bookId: book['book_id'],
-                                  bookTitle: book['book_title'],
-                                  rating: selectedRating,
-                                  content: contentController.text,
-                                );
-
-                                await loadReadingList();
-
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("Review berhasil disimpan"),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    SnackBar(content: Text("Gagal: $e")),
-                                  );
-                                }
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xff185FA5),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text("Simpan Review"),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+                Text(book['book_title'] ?? '', maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700,
+                      color: _ink, fontSize: 14)),
+                Text(book['book_author'] ?? '',
+                  style: const TextStyle(color: _muted, fontSize: 12)),
+              ])),
+            ]),
+            const SizedBox(height: 20),
+            const Text('Rating kamu',
+                style: TextStyle(fontWeight: FontWeight.w600, color: _ink)),
+            const SizedBox(height: 10),
+            Row(children: List.generate(5, (i) => GestureDetector(
+              onTap: () => ss(() => rating = i + 1),
+              child: Icon(i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: _amber, size: 38)))),
+            const SizedBox(height: 20),
+            const Text('Komentar (opsional)',
+                style: TextStyle(fontWeight: FontWeight.w600, color: _ink)),
+            const SizedBox(height: 8),
+            TextField(controller: ctrl, maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Tulis pendapatmu...',
+                filled: true, fillColor: _bg,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _blue, width: 1.5)))),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: rating == 0 ? null : () async {
+                Navigator.pop(ctx);
+                try {
+                  await ReadingListService().updateUserRating(
+                      id: book['id'], rating: rating);
+                  await ReviewService().createReview(
+                    userId: currentUser!.id,
+                    bookId: book['book_id'],
+                    bookTitle: book['book_title'],
+                    rating: rating, content: ctrl.text);
+                  await _load();
+                  _snack('Review berhasil disimpan ✓');
+                } catch (e) { _snack('Gagal: $e'); }
+              },
+              child: Container(
+                width: double.infinity, height: 52,
+                decoration: BoxDecoration(
+                  gradient: rating == 0
+                    ? LinearGradient(colors: [_blue.withOpacity(.4),
+                        _blueDark.withOpacity(.4)])
+                    : const LinearGradient(colors: [_blue, _blueDark]),
+                  borderRadius: BorderRadius.circular(14)),
+                child: const Center(child: Text('Simpan Review',
+                  style: TextStyle(color: Colors.white,
+                      fontWeight: FontWeight.w700))))),
+          ]))));
+    ctrl.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xffFBF9F5),
-
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: const Color(0xffFBF9F5),
-        title: const Row(
-          children: [
-            Icon(Icons.menu_book, color: Color(0xff031632)),
-            SizedBox(width: 8),
-            Text(
-              "BookShelf",
-              style: TextStyle(
-                color: Color(0xff031632),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.notifications_outlined, color: Color(0xff031632)),
-          ),
-        ],
-      ),
-
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "My Collection",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff031632),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              isReading = true;
-                            });
-                          },
-
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-
-                            decoration: BoxDecoration(
-                              color: isReading
-                                  ? Colors.white
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-
-                            child: Text(
-                              "Daftar Bacaan",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: isReading
-                                    ? const Color(0xff031632)
-                                    : Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              isReading = false;
-                            });
-                          },
-
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-
-                            decoration: BoxDecoration(
-                              color: !isReading
-                                  ? Colors.white
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-
-                            child: Text(
-                              "Selesai Dibaca (${finishedList.length})",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: !isReading
-                                    ? const Color(0xff031632)
-                                    : Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: isLoadingReadingList
-                ? const Center(child: CircularProgressIndicator())
-                : isReading
-                ? readingList.isEmpty
-                      ? const Center(
-                          child: Text(
-                            "Belum ada buku di daftar bacaan.",
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: readingList.length,
-                          itemBuilder: (context, index) {
-                            final book = readingList[index];
-                            return Dismissible(
-                              key: Key(book['id']),
-                              // Swipe kanan → selesai dibaca
-                              background: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xff1D9E75),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                alignment: Alignment.centerLeft,
-                                padding: const EdgeInsets.only(left: 20),
-                                child: const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline,
-                                      color: Colors.white,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "Selesai dibaca",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Swipe kiri → hapus
-                              secondaryBackground: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xffE24B4A),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 20),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      "Hapus",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.white,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              confirmDismiss: (direction) async {
-                                if (direction == DismissDirection.startToEnd) {
-                                  // Konfirmasi selesai dibaca
-                                  return await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text("Selesai dibaca?"),
-                                      content: Text(
-                                        "\"${book['book_title']}\" akan dipindah ke Selesai Dibaca.",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text("Batal"),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text("Ya"),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                } else {
-                                  // Konfirmasi hapus
-                                  return await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text("Hapus buku?"),
-                                      content: Text(
-                                        "\"${book['book_title']}\" akan dihapus dari daftar bacaan.",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text("Batal"),
-                                        ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xffE24B4A,
-                                            ),
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text("Hapus"),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-                              },
-                              onDismissed: (direction) async {
-                                if (direction == DismissDirection.startToEnd) {
-                                  final existingReviews = await ReviewService()
-                                      .getReviewsByUser(currentUser!.id);
-                                  final bookReview = existingReviews
-                                      .where((r) => r.bookId == book['book_id'])
-                                      .toList();
-
-                                  final rating = bookReview.isNotEmpty
-                                      ? bookReview.first.rating
-                                      : 0;
-                                  await ReadingListService().markAsFinished(
-                                    book['id'],
-                                    rating: rating,
-                                  );
-                                } else {
-                                  await ReadingListService()
-                                      .removeFromReadingList(
-                                        userId: currentUser!.id,
-                                        bookId: book['book_id'],
-                                      );
-                                }
-                                await loadReadingList();
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.grey.shade200,
-                                  ),
-                                ),
-                                child: ListTile(
-                                  onTap: () async {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => DetailBookPage(
-                                          bookId: book['book_id'],
-                                          bookTitle: book['book_title'],
-                                          bookAuthor: book['book_author'] ?? '',
-                                          imageUrl: book['cover_url'] ?? '',
-                                        ),
-                                      ),
-                                    );
-                                    await loadReadingList();
-                                  },
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Image.network(
-                                      book['cover_url'] ?? '',
-                                      width: 44,
-                                      height: 56,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        width: 44,
-                                        height: 56,
-                                        color: Colors.grey.shade200,
-                                        child: const Icon(Icons.book, size: 24),
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    book['book_title'] ?? '',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    book['book_author'] ?? '',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  trailing: const Icon(Icons.chevron_right),
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                : finishedList.isEmpty
-                ? const Center(
-                    child: Text(
-                      "Belum ada buku yang selesai dibaca.",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: finishedList.length,
-                    itemBuilder: (context, index) {
-                      final book = finishedList[index];
-                      return Dismissible(
-                        key: Key('finished_${book['id']}'),
-                        direction:
-                            DismissDirection.endToStart, // hanya swipe kiri
-                        background: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffE24B4A),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                "Hapus",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Icon(Icons.delete_outline, color: Colors.white),
-                            ],
-                          ),
-                        ),
-                        confirmDismiss: (_) async {
-                          return await showDialog<bool>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text("Hapus buku?"),
-                              content: Text(
-                                "\"${book['book_title']}\" akan dihapus dari daftar selesai dibaca.",
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  child: const Text("Batal"),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xffE24B4A),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text("Hapus"),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        onDismissed: (_) async {
-                          await ReadingListService().unmarkFinished(book['id']);
-                          await loadReadingList();
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: // Ganti trailing dan subtitle di ListTile finishedList
-                          ListTile(
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => DetailBookPage(
-                                    bookId: book['book_id'],
-                                    bookTitle: book['book_title'],
-                                    bookAuthor: book['book_author'] ?? '',
-                                    imageUrl: book['cover_url'] ?? '',
-                                  ),
-                                ),
-                              );
-                              await loadReadingList();
-                            },
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.network(
-                                book['cover_url'] ?? '',
-                                width: 44,
-                                height: 56,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 44,
-                                  height: 56,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(Icons.book, size: 24),
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              book['book_title'] ?? '',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            // ✅ Bintang interaktif sebagai subtitle
-                            subtitle: GestureDetector(
-                              onTap: () => showRatingReviewSheet(book),
-                              child: Row(
-                                children: [
-                                  ...List.generate(5, (index) {
-                                    final rating = book['user_rating'] ?? 0;
-                                    return Icon(
-                                      index < rating
-                                          ? Icons.star
-                                          : Icons.star_border,
-                                      color: Colors.amber,
-                                      size: 18,
-                                    );
-                                  }),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    book['user_rating'] == 0 ||
-                                            book['user_rating'] == null
-                                        ? "Beri rating"
-                                        : "${book['user_rating']}.0",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-
+      backgroundColor: _bg,
+      body: SafeArea(child: Column(children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Koleksiku', style: TextStyle(fontSize: 24,
+                fontWeight: FontWeight.w800, color: _ink, letterSpacing: -.3)),
+            const SizedBox(height: 16),
+            // Tab switcher
+            Container(
+              height: 46,
+              decoration: BoxDecoration(
+                color: _card, borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: _ink.withOpacity(.05),
+                    blurRadius: 10)]),
+              child: TabBar(
+                controller: _tab,
+                labelColor: Colors.white,
+                unselectedLabelColor: _muted,
+                labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 13),
+                indicator: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [_blue, _blueDark]),
+                  borderRadius: BorderRadius.circular(12)),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                tabs: [
+                  const Tab(text: 'Daftar Bacaan'),
+                  Tab(text: 'Selesai (${finishedList.length})'),
+                ])),
+          ])),
+        const SizedBox(height: 12),
+        Expanded(child: _loading
+          ? const Center(child: CircularProgressIndicator(color: _blue))
+          : TabBarView(controller: _tab, children: [
+              _bookList(readingList, isReading: true),
+              _bookList(finishedList, isReading: false),
+            ])),
+      ])),
     );
+  }
+
+  Widget _bookList(List<Map<String, dynamic>> list, {required bool isReading}) {
+    if (list.isEmpty) return Center(child: Column(
+      mainAxisSize: MainAxisSize.min, children: [
+      Icon(isReading
+          ? Icons.menu_book_outlined : Icons.check_circle_outline_rounded,
+        size: 64, color: _muted.withOpacity(.4)),
+      const SizedBox(height: 12),
+      Text(isReading
+          ? 'Belum ada buku di daftar bacaan'
+          : 'Belum ada buku yang selesai dibaca',
+        style: const TextStyle(color: _muted, fontSize: 15)),
+    ]));
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      itemCount: list.length,
+      itemBuilder: (_, i) {
+        final b = list[i];
+        return Dismissible(
+          key: Key(isReading ? b['id'] : 'f_${b['id']}'),
+          direction: isReading
+              ? DismissDirection.horizontal
+              : DismissDirection.endToStart,
+          background: _swipeBg(isReading
+              ? _green : _red,
+            isReading
+              ? Icons.check_circle_outline_rounded : Icons.delete_outline_rounded,
+            isReading ? 'Selesai' : 'Hapus',
+            Alignment.centerLeft),
+          secondaryBackground: isReading ? _swipeBg(_red,
+              Icons.delete_outline_rounded, 'Hapus',
+              Alignment.centerRight) : null,
+          confirmDismiss: (dir) => _confirmDismiss(dir, b, isReading),
+          onDismissed: (dir) => _onDismissed(dir, b, isReading),
+          child: _bookCard(b, isReading));
+      });
+  }
+
+  Widget _swipeBg(Color col, IconData icon, String label, Alignment align) =>
+    Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(color: col,
+          borderRadius: BorderRadius.circular(16)),
+      alignment: align,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (align == Alignment.centerLeft) ...[
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Colors.white,
+              fontWeight: FontWeight.w600))],
+        if (align == Alignment.centerRight) ...[
+          Text(label, style: const TextStyle(color: Colors.white,
+              fontWeight: FontWeight.w600)),
+          const SizedBox(width: 6),
+          Icon(icon, color: Colors.white, size: 20)],
+      ]));
+
+  Future<bool?> _confirmDismiss(DismissDirection dir,
+      Map<String, dynamic> b, bool isReading) async {
+    final toFinish = isReading && dir == DismissDirection.startToEnd;
+    final toDelete = (!isReading) || dir == DismissDirection.endToStart;
+    if (!toFinish && !toDelete) return false;
+    return showDialog<bool>(context: context, builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text(toFinish ? 'Tandai selesai?' : 'Hapus buku?'),
+      content: Text(toFinish
+          ? '"${b['book_title']}" akan dipindah ke Selesai Dibaca.'
+          : '"${b['book_title']}" akan dihapus.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: toFinish ? _green : _red,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10))),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(toFinish ? 'Ya' : 'Hapus')),
+      ]));
+  }
+
+  Future<void> _onDismissed(DismissDirection dir,
+      Map<String, dynamic> b, bool isReading) async {
+    if (isReading && dir == DismissDirection.startToEnd) {
+      final rev = await ReviewService().getReviewsByUser(currentUser!.id);
+      final rat = rev.where((r) => r.bookId == b['book_id']).isNotEmpty
+          ? rev.firstWhere((r) => r.bookId == b['book_id']).rating : 0;
+      await ReadingListService().markAsFinished(b['id'], rating: rat);
+    } else if (!isReading || dir == DismissDirection.endToStart) {
+      if (!isReading) {
+        await ReadingListService().unmarkFinished(b['id']);
+      } else {
+        await ReadingListService().removeFromReadingList(
+            userId: currentUser!.id, bookId: b['book_id']);
+      }
+    }
+    await _load();
+  }
+
+  Widget _bookCard(Map<String, dynamic> b, bool isReading) {
+    final rating = b['user_rating'] ?? 0;
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(context, MaterialPageRoute(
+            builder: (_) => DetailBookPage(
+              bookId: b['book_id'], bookTitle: b['book_title'],
+              bookAuthor: b['book_author'] ?? '',
+              imageUrl: b['cover_url'] ?? '')));
+        await _load();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _card, borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: _ink.withOpacity(.05),
+              blurRadius: 12, offset: const Offset(0, 4))]),
+        child: Row(children: [
+          ClipRRect(borderRadius: BorderRadius.circular(10),
+            child: Image.network(b['cover_url'] ?? '',
+              width: 48, height: 64, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 48, height: 64, color: _blueLight,
+                child: const Icon(Icons.book_rounded, color: _blue, size: 26)))),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text(b['book_title'] ?? '', maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700,
+                  color: _ink, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text(b['book_author'] ?? '',
+              style: const TextStyle(color: _muted, fontSize: 12)),
+            if (!isReading) ...[
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _showRatingSheet(b),
+                child: Row(children: [
+                  ...List.generate(5, (i) => Icon(
+                    i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: _amber, size: 16)),
+                  const SizedBox(width: 6),
+                  Text(rating == 0 ? 'Beri rating' : '$rating.0',
+                    style: const TextStyle(color: _muted, fontSize: 12)),
+                ])),
+            ],
+          ])),
+          const Icon(Icons.arrow_forward_ios_rounded, color: _muted, size: 14),
+        ])));
   }
 }

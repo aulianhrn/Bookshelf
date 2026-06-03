@@ -4,61 +4,74 @@ import 'package:bookself_/pages/profile_page.dart';
 import 'package:bookself_/pages/search_page.dart';
 import 'package:flutter/material.dart';
 
+const _blue   = Color(0xFF2563EB);
+const _ink    = Color(0xFF1E1B4B);
+const _bg     = Color(0xFFF4EAE1);
+
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
-
   @override
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
+  int _idx = 0;
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const SearchPage(),
-    const CollectionPage(),
-    const ProfilePage(),
+  final _pages = const [
+    HomePage(),
+    SearchPage(),
+    CollectionPage(),
+    ProfilePage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
-
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-
-        selectedItemColor: const Color(0xff9E421E),
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.white,
-        elevation: 8,
-        type: BottomNavigationBarType.fixed,
-
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+      body: IndexedStack(index: _idx, children: _pages),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(
+              color: const Color(0xFF1E1B4B).withOpacity(.08),
+              blurRadius: 20, offset: const Offset(0, -4))]),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _navItem(0, Icons.home_rounded,      Icons.home_outlined,      'Home'),
+                _navItem(1, Icons.search_rounded,    Icons.search_rounded,     'Cari'),
+                _navItem(2, Icons.auto_stories,      Icons.auto_stories_outlined, 'Koleksi'),
+                _navItem(3, Icons.person_rounded,    Icons.person_outline_rounded, 'Profil'),
+              ]),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.auto_stories),
-            label: 'Collection',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(int idx, IconData activeIcon, IconData inactiveIcon,
+      String label) {
+    final active = _idx == idx;
+    return GestureDetector(
+      onTap: () => setState(() => _idx = idx),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? _blue.withOpacity(.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(active ? activeIcon : inactiveIcon,
+              color: active ? _blue : const Color(0xFF9CA3AF), size: 24),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(
+              fontSize: 11,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+              color: active ? _blue : const Color(0xFF9CA3AF))),
+        ]),
       ),
     );
   }
