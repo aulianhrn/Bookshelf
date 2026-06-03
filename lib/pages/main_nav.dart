@@ -3,8 +3,6 @@ import 'package:bookself_/pages/home_page.dart';
 import 'package:bookself_/pages/profile_page.dart';
 import 'package:bookself_/pages/search_page.dart';
 import 'package:flutter/material.dart';
-import '../services/session_service.dart';
-import 'login_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -23,29 +21,10 @@ class _MainNavigationState extends State<MainNavigation> {
     const ProfilePage(),
   ];
 
-  Future<void> logout() async {
-    await SessionService.logout();
-
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (route) => false,
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Berhasil logout'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: IndexedStack(index: _currentIndex, children: _pages),
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -56,7 +35,7 @@ class _MainNavigationState extends State<MainNavigation> {
           });
         },
 
-        selectedItemColor: const Color(0xFFD4AF37),
+        selectedItemColor: const Color(0xff9E421E),
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.white,
         elevation: 8,
@@ -64,24 +43,20 @@ class _MainNavigationState extends State<MainNavigation> {
 
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Beranda',
+            icon: Icon(Icons.home),
+            label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.explore_outlined),
-            activeIcon: Icon(Icons.explore),
-            label: 'Eksplor',
+            icon: Icon(Icons.search),
+            label: 'Search',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.event_note_outlined),
-            activeIcon: Icon(Icons.event_note),
-            label: 'Booking',
+            icon: Icon(Icons.auto_stories),
+            label: 'Collection',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profil',
+            icon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),

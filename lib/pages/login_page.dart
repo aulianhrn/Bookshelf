@@ -1,6 +1,6 @@
 import 'package:bookself_/services/auth_service.dart';
 import 'package:flutter/material.dart';
-import 'home_page.dart';
+import 'main_nav.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -46,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const MainNavigation()),
       );
     } catch (e) {
       String errorMessage = 'Terjadi kesalahan';

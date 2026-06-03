@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -46,6 +47,14 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
+      await AuthService().register(
+        username: username,
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -53,7 +62,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registrasi berhasil! Silahkan Login!")),
+        const SnackBar(content: Text("Registrasi berhasil! Silahkan Login!")),
       );
     } catch (error) {
       if (!mounted) return;

@@ -2,11 +2,8 @@ import 'package:bookself_/services/review_service.dart';
 import 'package:bookself_/services/session_service.dart';
 import 'package:flutter/material.dart';
 import 'detail_page.dart';
-import 'home_page.dart';
-import 'search_page.dart';
 import '../models/app_user.dart';
 import '../services/reading_list_service.dart';
-import 'profile_page.dart';
 
 class CollectionPage extends StatefulWidget {
   const CollectionPage({super.key});
@@ -717,47 +714,6 @@ class _CollectionPageState extends State<CollectionPage> {
         ],
       ),
 
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2,
-
-        selectedItemColor: const Color(0xff9E421E),
-
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const HomePage()),
-            );
-          }
-          if (index == 1) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const SearchPage()),
-            );
-          }
-          if (index == 3) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
-              (_) => false,
-            );
-          }
-        },
-
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
-
-          BottomNavigationBarItem(
-            icon: Icon(Icons.auto_stories),
-            label: "Collection",
-          ),
-
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
-      ),
     );
   }
 }

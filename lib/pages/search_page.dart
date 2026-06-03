@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/open_library_book.dart';
 import '../services/open_library_service.dart';
-import 'collection_page.dart';
 import 'detail_page.dart';
-import 'home_page.dart';
-import 'profile_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key, this.initialQuery});
@@ -174,43 +171,6 @@ class _SearchPageState extends State<SearchPage> {
             Expanded(
               child: hasSearched ? _buildSearchResults() : _buildDiscovery(),
             ),
-          ],
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: 1,
-          selectedItemColor: const Color(0xff9E421E),
-          unselectedItemColor: Colors.grey,
-          onTap: (index) {
-            if (index == 0) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const HomePage()),
-                (route) => false,
-              );
-            }
-            if (index == 2) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const CollectionPage()),
-                (route) => false,
-              );
-            }
-            if (index == 3) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
-                (_) => false,
-              );
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-            BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.auto_stories),
-              label: "Collection",
-            ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
       ),

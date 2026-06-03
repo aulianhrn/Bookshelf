@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../models/app_user.dart';
-import 'session_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'session_service.dart';
 
 class AuthService {
   String hashPassword(String password) {
@@ -27,8 +27,6 @@ class AuthService {
         .single();
 
     final user = AppUser.fromJson(row);
-
-    await SessionService.saveSession(user);
 
     return user;
   }

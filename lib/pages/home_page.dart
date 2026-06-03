@@ -5,11 +5,9 @@ import '../models/app_user.dart';
 import '../models/open_library_book.dart';
 import '../services/open_library_service.dart';
 import '../services/bookstore_service.dart';
-import 'collection_page.dart';
 import 'detail_page.dart';
 import 'login_page.dart';
 import 'search_page.dart';
-import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -339,13 +337,7 @@ class _HomePageState extends State<HomePage> {
                       leading: const Icon(Icons.book, size: 40),
                       title: Text(book.title),
                       subtitle: Text(book.author),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber),
-                          Text(book.ratingText),
-                        ],
-                      ),
+                      trailing: const Icon(Icons.chevron_right),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -361,41 +353,6 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-      ),
-
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        selectedItemColor: const Color(0xff9E421E),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SearchPage()),
-            );
-          }
-          if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CollectionPage()),
-            );
-          }
-          if (index == 3) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book),
-            label: "Collection",
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
       ),
     );
   }

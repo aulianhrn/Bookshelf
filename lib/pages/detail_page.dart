@@ -247,26 +247,18 @@ class _DetailBookPageState extends State<DetailBookPage> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    final content = contentController.text.trim();
                     Navigator.pop(dialogContext);
                     try {
-                      print('=== MULAI CREATE REVIEW ===');
-                      print('userId: ${currentUser!.id}');
-                      print('bookId: ${widget.effectiveBookId}');
-                      print('bookTitle: ${widget.effectiveBookTitle}');
-                      print('rating: $rating');
-                      print('content: ${contentController.text}');
-
                       await ReviewService().createReview(
                         userId: currentUser!.id,
                         bookId: widget.effectiveBookId,
                         bookTitle: widget.effectiveBookTitle,
                         rating: rating,
-                        content: contentController.text,
+                        content: content,
                       );
 
-                      print('=== CREATE REVIEW BERHASIL ===');
                       await loadReviews();
-                      print('=== LOAD REVIEWS SELESAI ===');
 
                       scaffoldMessenger.showSnackBar(
                         const SnackBar(
@@ -274,10 +266,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
                           backgroundColor: Colors.green,
                         ),
                       );
-                    } catch (error, stackTrace) {
-                      print('=== ERROR ===');
-                      print('Error: $error');
-                      print('StackTrace: $stackTrace');
+                    } catch (error) {
                       scaffoldMessenger.showSnackBar(
                         SnackBar(content: Text("Gagal: $error")),
                       );

@@ -29,9 +29,10 @@ class Review {
       bookTitle: json['book_title'] as String,
       rating: json['rating'] as int,
       content: json['content'] as String?,
-      username: user is Map<String, dynamic>
+      username: json['username'] as String? ??
+          (user is Map<String, dynamic>
           ? user['username'] as String?
-          : null,
+          : null),
       createdAt: json['created_at'] == null
           ? null
           : DateTime.tryParse(json['created_at'] as String),
