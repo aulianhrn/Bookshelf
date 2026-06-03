@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../models/app_user.dart';
 import 'session_service.dart';
-import 'supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
   String hashPassword(String password) {
@@ -16,7 +16,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final row = await SupabaseService.client
+    final row = await Supabase.instance.client
         .from('users')
         .insert({
           'username': username,
@@ -37,7 +37,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final row = await SupabaseService.client
+    final row = await Supabase.instance.client
         .from('users')
         .select(
           'id,email,username,password_hash',

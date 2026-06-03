@@ -5,14 +5,18 @@ import 'pages/home_page.dart';
 import 'pages/login_page.dart';
 import 'services/session_service.dart';
 import 'models/app_user.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
     url: 'https://ioibwzbdgkwkzpgvyyeh.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvaWJ3emJkZ2t3a3pwZ3Z5eWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjUwMDcsImV4cCI6MjA5NTkwMTAwN30.n1C9nTt4IF55p3mtsA8iDq6aC31x7HHLmR72XRh99oU',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvaWJ3emJkZ2t3a3pwZ3Z5eWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjUwMDcsImV4cCI6MjA5NTkwMTAwN30.n1C9nTt4IF55p3mtsA8iDq6aC31x7HHLmR72XRh99oU',
   );
+
+  // await NotificationService.init();
 
   runApp(const MyApp());
 }
@@ -27,9 +31,7 @@ class MyApp extends StatelessWidget {
       title: 'BookShelf',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff9E421E),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff9E421E)),
       ),
       home: const AppRoot(),
     );
@@ -48,12 +50,9 @@ class AppRoot extends StatelessWidget {
     return FutureBuilder<AppUser?>(
       future: _loadUser(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 

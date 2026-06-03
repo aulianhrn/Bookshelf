@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import '../models/app_user.dart';
 import '../models/open_library_book.dart';
 import '../services/open_library_service.dart';
+import '../services/bookstore_service.dart';
 import 'collection_page.dart';
 import 'detail_page.dart';
 import 'login_page.dart';
 import 'search_page.dart';
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -74,6 +76,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _findNearbyBookstore() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    final position = await BookstoreService.getCurrentLocation();
+
+    if (position == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Tidak dapat mengakses lokasi. Pastikan GPS aktif dan izin lokasi diberikan.",
+          ),
+        ),
+      );
+      return;
+    }
+
+    await BookstoreService.openGoogleMapsBookstore(position);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,19 +148,111 @@ class _HomePageState extends State<HomePage> {
               ),
 
               const SizedBox(height: 30),
+              const Text(
+                "Kategori Populer",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Trending Sekarang",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children:
+                      [
+                            "Fantasy",
+                            "Romance",
+                            "Mystery",
+                            "Science Fiction",
+                            "History",
+                            "Horror",
+                            "Biography",
+                            "Thriller",
+                          ]
+                          .map(
+                            (category) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ActionChip(
+                                label: Text(category),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          SearchPage(initialQuery: category),
+                                    ),
+                                  );
+                                },
+                                shape: const StadiumBorder(),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Banner toko buku terdekat
+              GestureDetector(
+                onTap: _findNearbyBookstore,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffE6F1FB),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text("Lihat Semua"),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xff185FA5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.map_outlined,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Temukan toko buku terdekat",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xff0C447C),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              "Cari toko buku di sekitar lokasimu",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xff185FA5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: Color(0xff185FA5)),
+                    ],
                   ),
-                ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              const SizedBox(height: 30),
+              const Text(
+                "Trending Sekarang",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
 
               const SizedBox(height: 12),
@@ -204,27 +317,6 @@ class _HomePageState extends State<HomePage> {
                       ),
               ),
 
-              const SizedBox(height: 24),
-
-              const Text(
-                "Kategori Populer",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 12),
-
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: const [
-                  Chip(label: Text("Fantasy")),
-                  Chip(label: Text("Romance")),
-                  Chip(label: Text("Mystery")),
-                  Chip(label: Text("Science Fiction")),
-                  Chip(label: Text("History")),
-                ],
-              ),
-
               const SizedBox(height: 30),
 
               const Text(
@@ -286,6 +378,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const CollectionPage()),
+            );
+          }
+          if (index == 3) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
             );
           }
         },

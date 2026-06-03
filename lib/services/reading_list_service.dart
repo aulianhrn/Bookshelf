@@ -41,12 +41,37 @@ class ReadingListService {
         .eq('book_id', bookId);
   }
 
-  Future<void> markAsFinished(String id) async {
+  // Pindah kembali ke daftar bacaan (batal selesai)
+  Future<void> unmarkFinished(String id) async {
+    await _client
+        .from('reading_list')
+        .update({'is_finished': false, 'finished_at': null})
+        .eq('id', id);
+  }
+
+  // Cek apakah buku sudah selesai dibaca
+  Future<bool> isFinished({
+    required String userId,
+    required String bookId,
+  }) async {
+    final rows = await _client
+        .from('reading_list')
+        .select('is_finished')
+        .eq('user_id', userId)
+        .eq('book_id', bookId)
+        .limit(1);
+
+    if (rows.isEmpty) return false;
+    return rows.first['is_finished'] == true;
+  }
+
+  Future<void> markAsFinished(String id, {int rating = 0}) async {
     await _client
         .from('reading_list')
         .update({
           'is_finished': true,
           'finished_at': DateTime.now().toIso8601String(),
+          'user_rating': rating,
         })
         .eq('id', id);
   }
@@ -63,5 +88,15 @@ class ReadingListService {
         .order('added_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<void> updateUserRating({
+    required String id,
+    required int rating,
+  }) async {
+    await _client
+        .from('reading_list')
+        .update({'user_rating': rating})
+        .eq('id', id);
   }
 }

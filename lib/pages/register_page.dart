@@ -1,6 +1,4 @@
-import 'package:bookself_/services/auth_service.dart';
 import 'package:flutter/material.dart';
-import 'home_page.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -48,14 +46,6 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      final user = await AuthService().register(
-        username: username,
-        email: email,
-        password: password,
-      );
-
-      if (!mounted) return;
-
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginPage()),

@@ -6,15 +6,16 @@ import '../models/review.dart';
 import '../services/open_library_service.dart';
 import '../models/app_user.dart';
 import '../services/reading_list_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DetailBookPage extends StatefulWidget {
   const DetailBookPage({
     super.key,
     this.book,
-    this.bookId = 'silent-alchemist',
-    this.bookTitle = 'The Silent Alchemist',
-    this.bookAuthor = 'Elias Thornewood',
-    this.imageUrl = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f',
+    this.bookId = '',
+    this.bookTitle = '',
+    this.bookAuthor = '',
+    this.imageUrl = '',
   });
 
   final OpenLibraryBook? book;
@@ -27,7 +28,6 @@ class DetailBookPage extends StatefulWidget {
   String get effectiveBookTitle => book?.title ?? bookTitle;
   String get effectiveBookAuthor => book?.author ?? bookAuthor;
   String get effectiveImageUrl => book?.coverUrl ?? imageUrl;
-  int? get effectivePublishYear => book?.firstPublishYear;
   int? get effectiveEditionCount => book?.editionCount;
 
   @override
@@ -39,6 +39,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
   bool isLoadingReviews = true;
   bool isInReadingList = false;
   bool isLoadingReadingList = false;
+  bool isFinished = false;
   List<Review> reviews = [];
   AppUser? currentUser;
   String? synopsis;
@@ -49,7 +50,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
     super.initState();
     loadReviews();
     loadSynopsis();
-    _loadCurrentUser();
     _loadCurrentUser().then((_) => checkReadingList());
   }
 
@@ -60,11 +60,23 @@ class _DetailBookPageState extends State<DetailBookPage> {
 
   Future<void> checkReadingList() async {
     if (currentUser == null) return;
-    final result = await ReadingListService().isInReadingList(
+
+    final inList = await ReadingListService().isInReadingList(
       userId: currentUser!.id,
       bookId: widget.effectiveBookId,
     );
-    if (mounted) setState(() => isInReadingList = result);
+
+    final finished = await ReadingListService().isFinished(
+      userId: currentUser!.id,
+      bookId: widget.effectiveBookId,
+    );
+
+    if (mounted) {
+      setState(() {
+        isInReadingList = inList;
+        isFinished = finished;
+      });
+    }
   }
 
   Future<void> toggleReadingList() async {
@@ -78,13 +90,41 @@ class _DetailBookPageState extends State<DetailBookPage> {
     setState(() => isLoadingReadingList = true);
 
     try {
-      if (isInReadingList) {
+      if (isFinished) {
+        // Jika sudah selesai → pindah kembali ke daftar bacaan
+        final rows = await Supabase.instance.client
+            .from('reading_list')
+            .select('id')
+            .eq('user_id', currentUser!.id)
+            .eq('book_id', widget.effectiveBookId)
+            .limit(1);
+
+        if (rows.isNotEmpty) {
+          await ReadingListService().unmarkFinished(rows.first['id']);
+        }
+
+        if (mounted)
+          setState(() {
+            isFinished = false;
+            isInReadingList = true;
+          });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Buku dipindahkan kembali ke daftar bacaan"),
+            ),
+          );
+        }
+      } else if (isInReadingList) {
+        // Jika di daftar bacaan → hapus dari perpustakaan
         await ReadingListService().removeFromReadingList(
           userId: currentUser!.id,
           bookId: widget.effectiveBookId,
         );
         if (mounted) setState(() => isInReadingList = false);
       } else {
+        // Belum ada → tambah ke daftar bacaan
         await ReadingListService().addToReadingList(
           userId: currentUser!.id,
           book: widget.book!,
@@ -158,12 +198,15 @@ class _DetailBookPageState extends State<DetailBookPage> {
 
     var rating = 5;
     final contentController = TextEditingController();
+    // ✅ Simpan context sebelum dialog dibuka
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          // ✅ Ganti nama parameter agar tidak menimpa dialogContext
+          builder: (_, setDialogState) {
             return AlertDialog(
               title: const Text("Tulis Review"),
               content: Column(
@@ -177,9 +220,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
                       5,
                       (index) => IconButton(
                         onPressed: () {
-                          setDialogState(() {
-                            rating = index + 1;
-                          });
+                          setDialogState(() => rating = index + 1);
                         },
                         icon: Icon(
                           index < rating ? Icons.star : Icons.star_border,
@@ -201,14 +242,20 @@ class _DetailBookPageState extends State<DetailBookPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text("Batal"),
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    Navigator.pop(dialogContext);
                     try {
+                      print('=== MULAI CREATE REVIEW ===');
+                      print('userId: ${currentUser!.id}');
+                      print('bookId: ${widget.effectiveBookId}');
+                      print('bookTitle: ${widget.effectiveBookTitle}');
+                      print('rating: $rating');
+                      print('content: ${contentController.text}');
+
                       await ReviewService().createReview(
                         userId: currentUser!.id,
                         bookId: widget.effectiveBookId,
@@ -217,15 +264,22 @@ class _DetailBookPageState extends State<DetailBookPage> {
                         content: contentController.text,
                       );
 
-                      if (!dialogContext.mounted) return;
-                      Navigator.pop(dialogContext);
+                      print('=== CREATE REVIEW BERHASIL ===');
                       await loadReviews();
-                    } catch (error) {
-                      if (!dialogContext.mounted) return;
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        SnackBar(
-                          content: Text("Gagal menyimpan review: $error"),
+                      print('=== LOAD REVIEWS SELESAI ===');
+
+                      scaffoldMessenger.showSnackBar(
+                        const SnackBar(
+                          content: Text("Review berhasil disimpan"),
+                          backgroundColor: Colors.green,
                         ),
+                      );
+                    } catch (error, stackTrace) {
+                      print('=== ERROR ===');
+                      print('Error: $error');
+                      print('StackTrace: $stackTrace');
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(content: Text("Gagal: $error")),
                       );
                     }
                   },
@@ -244,18 +298,20 @@ class _DetailBookPageState extends State<DetailBookPage> {
   Future<void> showEditReviewDialog(Review review) async {
     final contentController = TextEditingController(text: review.content);
     int selectedRating = review.rating;
+    // ✅ Simpan scaffoldMessenger sebelum dialog dibuka
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     await showDialog<void>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
+          // ✅ Ganti (context, setStateDialog) → (_, setStateDialog)
+          builder: (_, setStateDialog) {
             return AlertDialog(
               title: const Text("Edit Review"),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Bintang rating
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(5, (index) {
@@ -280,19 +336,30 @@ class _DetailBookPageState extends State<DetailBookPage> {
                 ],
               ),
               actions: [
-                // Tombol hapus
                 TextButton(
                   onPressed: () async {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     try {
                       await ReviewService().deleteReview(review.id);
+                      if (currentUser != null) {
+                        final rows = await Supabase.instance.client
+                            .from('reading_list')
+                            .select('id')
+                            .eq('user_id', currentUser!.id)
+                            .eq('book_id', widget.effectiveBookId)
+                            .limit(1);
+                        if (rows.isNotEmpty) {
+                          await ReadingListService().updateUserRating(
+                            id: rows.first['id'],
+                            rating: 0,
+                          );
+                        }
+                      }
                       await loadReviews();
                     } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Gagal menghapus: $e")),
-                        );
-                      }
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(content: Text("Gagal menghapus: $e")),
+                      );
                     }
                   },
                   child: const Text(
@@ -301,12 +368,12 @@ class _DetailBookPageState extends State<DetailBookPage> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text("Batal"),
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     try {
                       await ReviewService().updateReview(
                         id: review.id,
@@ -315,11 +382,9 @@ class _DetailBookPageState extends State<DetailBookPage> {
                       );
                       await loadReviews();
                     } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Gagal mengupdate: $e")),
-                        );
-                      }
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(content: Text("Gagal mengupdate: $e")),
+                      );
                     }
                   },
                   child: const Text("Simpan"),
@@ -330,6 +395,8 @@ class _DetailBookPageState extends State<DetailBookPage> {
         );
       },
     );
+
+    contentController.dispose();
   }
 
   double get averageRating {
@@ -399,10 +466,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
                   color: const Color(0xffCFE8DD),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  "Sastra Klasik",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -457,19 +520,29 @@ class _DetailBookPageState extends State<DetailBookPage> {
                           ),
                         )
                       : Icon(
-                          isInReadingList
+                          isFinished
+                              ? Icons.check_circle
+                              : isInReadingList
                               ? Icons.library_books
                               : Icons.library_add,
                         ),
                   label: Text(
-                    isInReadingList
+                    isFinished
+                        ? "Selesai dibaca"
+                        : isInReadingList
                         ? "Hapus dari perpustakaan"
                         : "Tambah ke perpustakaan",
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isInReadingList
-                        ? const Color(0xff9E421E)
-                        : const Color(0xff185FA5),
+                    backgroundColor: isFinished
+                        ? Colors
+                              .grey
+                              .shade400 // abu-abu jika selesai
+                        : isInReadingList
+                        ? const Color(0xff9E421E) // merah jika di daftar bacaan
+                        : const Color(
+                            0xff185FA5,
+                          ), // biru jika belum ditambahkan
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -548,7 +621,9 @@ class _DetailBookPageState extends State<DetailBookPage> {
   }
 
   Widget reviewCard(Review review) {
-    final name = review.username ?? "Pembaca";
+    final name = (review.username == null || review.username!.isEmpty)
+        ? "Pembaca"
+        : review.username!;
     // Cek apakah review ini milik user yang sedang login
     final isOwner = currentUser?.id == review.userId;
 
@@ -561,7 +636,9 @@ class _DetailBookPageState extends State<DetailBookPage> {
           children: [
             Row(
               children: [
-                CircleAvatar(child: Text(name[0].toUpperCase())),
+                CircleAvatar(
+                  child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'P'),
+                ),
                 const SizedBox(width: 12),
                 Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
