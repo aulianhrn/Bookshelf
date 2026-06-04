@@ -55,6 +55,28 @@ class OpenLibraryService {
     return searchBooks(query: 'classic literature', limit: 10);
   }
 
+  /// Fetch satu buku dari Open Library berdasarkan work key.
+  /// [workKey] bisa dalam format '/works/OL27516W' atau 'OL27516W'.
+  Future<OpenLibraryBook?> fetchBookById(String workKey) async {
+    // Normalkan ke bare ID (OL27516W)
+    final bareId = workKey.replaceFirst(RegExp(r'^/works/'), '');
+
+    final uri = Uri.https(_baseUrl, '/search.json', {
+      'q': 'key:/works/$bareId',
+      'limit': '1',
+      'fields': 'key,title,author_name,cover_i,first_publish_year,edition_count,ratings_average',
+    });
+
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) return null;
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final docs = body['docs'];
+    if (docs is! List || docs.isEmpty) return null;
+
+    return OpenLibraryBook.fromJson(docs.first as Map<String, dynamic>);
+  }
+
   Future<String?> getBookDescription(String workKey) async {
     // workKey dari search hasil adalah format "/works/OL27516W"
     final path = workKey.startsWith('/works/')

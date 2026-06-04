@@ -1,4 +1,6 @@
+import 'package:bookself_/models/riwayat_pencarian.dart';
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'pages/login_page.dart';
@@ -8,7 +10,10 @@ import 'models/app_user.dart';
 import 'services/notification_service.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized(); 
+  await Hive.initFlutter(); 
+  Hive.registerAdapter(RiwayatPencarianAdapter());
+  await Hive.openBox<RiwayatPencarian>('riwayat');
 
   await Supabase.initialize(
     url: 'https://ioibwzbdgkwkzpgvyyeh.supabase.co',

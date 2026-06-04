@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../models/app_user.dart';
 import '../models/open_library_book.dart';
 import '../services/open_library_service.dart';
+import '../services/riwayat_servcie.dart';
+import '../services/session_service.dart';
 import 'detail_page.dart';
 
 const _bg = Color(0xFFF4EAE1);
@@ -13,10 +15,16 @@ const _accent = Color(0xFF9E421E);
 const _card = Color(0xFFFFFFFF);
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key, this.initialQuery, this.queryVersion = 0});
+  const SearchPage({
+    super.key,
+    this.initialQuery,
+    this.queryVersion = 0,
+    this.isActive = false,
+  });
 
   final String? initialQuery;
   final int queryVersion;
+  final bool isActive;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -25,9 +33,10 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final _ctrl = TextEditingController();
   final _focus = FocusNode();
+  final _riwayatService = RiwayatService();
   final _genres = const ['Fiksi', 'Sains', 'Sejarah', 'Klasik'];
-  static const _prefKey = 'recent_searches';
 
+  AppUser? currentUser;
   List<String> recentSearches = [];
   List<OpenLibraryBook> books = [];
   bool _loading = false;
@@ -37,7 +46,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    _initHistory();
     _focus.addListener(() => setState(() => _focused = _focus.hasFocus));
     if (widget.initialQuery?.isNotEmpty == true) {
       _searchInitialQuery();
@@ -50,6 +59,9 @@ class _SearchPageState extends State<SearchPage> {
     if (widget.queryVersion != oldWidget.queryVersion &&
         widget.initialQuery?.isNotEmpty == true) {
       _searchInitialQuery();
+    }
+    if (widget.isActive && !oldWidget.isActive) {
+      _initHistory();
     }
   }
 
@@ -104,27 +116,32 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  Future<void> _loadHistory() async {
-    final p = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() => recentSearches = p.getStringList(_prefKey) ?? []);
-    }
+  Future<void> _initHistory() async {
+    final user = await SessionService.getCurrentUser();
+    if (!mounted) return;
+    setState(() {
+      currentUser = user;
+      recentSearches = user == null ? [] : _riwayatService.getByUser(user.id);
+    });
   }
 
   Future<void> _saveHistory(String q) async {
-    final p = await SharedPreferences.getInstance();
-    recentSearches.remove(q);
-    recentSearches.insert(0, q);
-    if (recentSearches.length > 10) {
-      recentSearches = recentSearches.sublist(0, 10);
-    }
-    await p.setStringList(_prefKey, recentSearches);
-    if (mounted) setState(() {});
+    final user = currentUser ?? await SessionService.getCurrentUser();
+    if (user == null) return;
+
+    await _riwayatService.saveSearch(userId: user.id, query: q);
+    if (!mounted) return;
+    setState(() {
+      currentUser = user;
+      recentSearches = _riwayatService.getByUser(user.id);
+    });
   }
 
   Future<void> _clearHistory() async {
-    final p = await SharedPreferences.getInstance();
-    await p.remove(_prefKey);
+    final user = currentUser ?? await SessionService.getCurrentUser();
+    if (user == null) return;
+
+    await _riwayatService.clearByUser(user.id);
     if (mounted) setState(() => recentSearches = []);
   }
 
@@ -385,7 +402,7 @@ class _SearchPageState extends State<SearchPage> {
         return GestureDetector(
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => DetailBookPage(book: b)),
+            MaterialPageRoute(builder: (_) => DetailBookPage(bookId: b.id)),
           ),
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),

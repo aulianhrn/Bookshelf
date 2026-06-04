@@ -19,7 +19,8 @@ const _danger    = Color(0xFFE24B4A);
 // ────────────────────────────────────────────────────────────────────────────
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.isActive = false});
+  final bool isActive;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -49,6 +50,14 @@ class _ProfilePageState extends State<ProfilePage>
   void dispose() {
     _fadeCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(ProfilePage old) {
+    super.didUpdateWidget(old);
+    if (widget.isActive && !old.isActive) {
+      _init();
+    }
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────

@@ -16,12 +16,21 @@ class _MainNavigationState extends State<MainNavigation> {
   int _idx = 0;
   String? _searchQuery;
   int _searchQueryVersion = 0;
+  final List<int> _refreshVersions = [0, 0, 0, 0];
 
   void _openSearch(String query) {
     setState(() {
       _idx = 1;
       _searchQuery = query;
       _searchQueryVersion++;
+      _refreshVersions[1]++;
+    });
+  }
+
+  void _onTabTap(int idx) {
+    setState(() {
+      _idx = idx;
+      _refreshVersions[idx]++;
     });
   }
 
@@ -31,13 +40,25 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(
         index: _idx,
         children: [
-          HomePage(onCategorySelected: _openSearch),
+          HomePage(
+            key: ValueKey('home-${_refreshVersions[0]}'),
+            onCategorySelected: _openSearch,
+            isActive: _idx == 0,
+          ),
           SearchPage(
+            key: ValueKey('search-${_refreshVersions[1]}'),
             initialQuery: _searchQuery,
             queryVersion: _searchQueryVersion,
+            isActive: _idx == 1,
           ),
-          const CollectionPage(),
-          const ProfilePage(),
+          CollectionPage(
+            key: ValueKey('collection-${_refreshVersions[2]}'),
+            isActive: _idx == 2,
+          ),
+          ProfilePage(
+            key: ValueKey('profile-${_refreshVersions[3]}'),
+            isActive: _idx == 3,
+          ),
         ],
       ),
       bottomNavigationBar: Container(
@@ -87,7 +108,7 @@ class _MainNavigationState extends State<MainNavigation> {
   ) {
     final active = _idx == idx;
     return GestureDetector(
-      onTap: () => setState(() => _idx = idx),
+      onTap: () => _onTabTap(idx),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

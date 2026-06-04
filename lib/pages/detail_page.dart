@@ -23,29 +23,30 @@ const _amber = Color(0xFFF59E0B);
 // ───────────────────────────────────────────────────────────────────────────
 
 class DetailBookPage extends StatefulWidget {
-  const DetailBookPage({
-    super.key,
-    this.book,
-    this.bookId = '',
-    this.bookTitle = '',
-    this.bookAuthor = '',
-    this.imageUrl = '',
-  });
+  const DetailBookPage({super.key, required this.bookId});
 
-  final OpenLibraryBook? book;
   final String bookId;
-  final String bookTitle;
-  final String bookAuthor;
-  final String imageUrl;
-
-  String get effectiveBookId => book?.id ?? bookId;
-  String get effectiveBookTitle => book?.title ?? bookTitle;
-  String get effectiveBookAuthor => book?.author ?? bookAuthor;
-  String get effectiveImageUrl => book?.coverUrl ?? imageUrl;
-  int? get effectiveEditionCount => book?.editionCount;
 
   @override
   State<DetailBookPage> createState() => _DetailBookPageState();
+}
+
+class _ReviewSheetResult {
+  const _ReviewSheetResult._({
+    required this.rating,
+    required this.content,
+    required this.delete,
+  });
+
+  const _ReviewSheetResult.save({required int rating, required String content})
+    : this._(rating: rating, content: content, delete: false);
+
+  const _ReviewSheetResult.delete()
+    : this._(rating: 0, content: '', delete: true);
+
+  final int rating;
+  final String content;
+  final bool delete;
 }
 
 class _DetailBookPageState extends State<DetailBookPage>
@@ -59,6 +60,16 @@ class _DetailBookPageState extends State<DetailBookPage>
   AppUser? currentUser;
   String? synopsis;
   bool isLoadingSynopsis = false;
+  OpenLibraryBook? _fetchedBook;
+
+  bool isLoading = true;
+
+  OpenLibraryBook? get _resolvedBook => _fetchedBook;
+
+  String get _displayTitle => _resolvedBook?.title ?? '';
+  String get _displayAuthor => _resolvedBook?.author ?? '';
+  String get _displayImageUrl => _resolvedBook?.coverUrl ?? '';
+  int? get _displayEditionCount => _resolvedBook?.editionCount;
 
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
@@ -66,17 +77,63 @@ class _DetailBookPageState extends State<DetailBookPage>
   @override
   void initState() {
     super.initState();
+
     _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
 
-    loadReviews();
-    loadSynopsis();
-    _loadCurrentUser().then((_) => checkReadingList());
+    _initializePage();
+  }
 
-    Future.delayed(const Duration(milliseconds: 100), _fadeCtrl.forward);
+  Future<void> _initializePage() async {
+    try {
+      await _loadCurrentUser();
+
+      final bookFuture = OpenLibraryService.instance.fetchBookById(
+        widget.bookId,
+      );
+
+      final synopsisFuture = OpenLibraryService.instance.getBookDescription(
+        widget.bookId,
+      );
+
+      final reviewsFuture = ReviewService().getReviewsByBook(widget.bookId);
+
+      final results = await Future.wait([
+        bookFuture,
+        synopsisFuture,
+        reviewsFuture,
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _fetchedBook = results[0] as OpenLibraryBook;
+        synopsis = results[1] as String?;
+        reviews = results[2] as List<Review>;
+
+        isLoading = false;
+        isLoadingReviews = false;
+        isLoadingSynopsis = false;
+      });
+
+      await checkReadingList();
+
+      _fadeCtrl.forward();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+        isLoadingReviews = false;
+        isLoadingSynopsis = false;
+      });
+
+      _snack('Gagal memuat data: $e');
+    }
   }
 
   @override
@@ -96,11 +153,11 @@ class _DetailBookPageState extends State<DetailBookPage>
     if (currentUser == null) return;
     final inList = await ReadingListService().isInReadingList(
       userId: currentUser!.id,
-      bookId: widget.effectiveBookId,
+      bookId: widget.bookId,
     );
     final finished = await ReadingListService().isFinished(
       userId: currentUser!.id,
-      bookId: widget.effectiveBookId,
+      bookId: widget.bookId,
     );
     if (mounted) {
       setState(() {
@@ -122,7 +179,7 @@ class _DetailBookPageState extends State<DetailBookPage>
             .from('reading_list')
             .select('id')
             .eq('user_id', currentUser!.id)
-            .eq('book_id', widget.effectiveBookId)
+            .eq('book_id', widget.bookId)
             .limit(1);
         if (rows.isNotEmpty) {
           await ReadingListService().unmarkFinished(rows.first['id']);
@@ -137,13 +194,13 @@ class _DetailBookPageState extends State<DetailBookPage>
       } else if (isInReadingList) {
         await ReadingListService().removeFromReadingList(
           userId: currentUser!.id,
-          bookId: widget.effectiveBookId,
+          bookId: widget.bookId,
         );
         if (mounted) setState(() => isInReadingList = false);
       } else {
         await ReadingListService().addToReadingList(
           userId: currentUser!.id,
-          book: widget.book!,
+          book: _resolvedBook!,
         );
         if (mounted) setState(() => isInReadingList = true);
       }
@@ -155,8 +212,8 @@ class _DetailBookPageState extends State<DetailBookPage>
   }
 
   Future<void> loadSynopsis() async {
-    final workKey = widget.book?.id;
-    if (workKey == null) return;
+    final workKey = widget.bookId;
+    if (workKey.isEmpty) return;
     setState(() => isLoadingSynopsis = true);
     try {
       final result = await OpenLibraryService.instance.getBookDescription(
@@ -172,11 +229,10 @@ class _DetailBookPageState extends State<DetailBookPage>
   }
 
   Future<void> loadReviews() async {
+    if (!mounted) return;
     setState(() => isLoadingReviews = true);
     try {
-      final rows = await ReviewService().getReviewsByBook(
-        widget.effectiveBookId,
-      );
+      final rows = await ReviewService().getReviewsByBook(widget.bookId);
       if (!mounted) return;
       setState(() => reviews = rows);
     } catch (error) {
@@ -197,124 +253,127 @@ class _DetailBookPageState extends State<DetailBookPage>
     var rating = 5;
     final ctrl = TextEditingController();
 
-    await showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<_ReviewSheetResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (_, setSheet) => _reviewSheet(
+        builder: (sheetContext, setSheet) => _reviewSheet(
+          sheetContext: sheetContext,
           title: 'Tulis Review',
           rating: rating,
           controller: ctrl,
           onRatingChanged: (r) => setSheet(() => rating = r),
-          onSave: () async {
-            final savedRating = rating;
-            final savedContent = ctrl.text.trim();
-            Navigator.pop(ctx);
-            await Future<void>.delayed(Duration.zero);
-            if (!mounted) return;
-            try {
-              await ReviewService().createReview(
-                userId: currentUser!.id,
-                bookId: widget.effectiveBookId,
-                bookTitle: widget.effectiveBookTitle,
-                rating: savedRating,
-                content: savedContent,
-              );
-              await loadReviews();
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                _buildSnackBar('Review berhasil disimpan', color: _green),
-              );
-            } catch (e) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(_buildSnackBar('Gagal: $e', color: _danger));
-            }
-          },
+          onSave: () => Navigator.pop(
+            ctx,
+            _ReviewSheetResult.save(rating: rating, content: ctrl.text.trim()),
+          ),
           onCancel: () => Navigator.pop(ctx),
         ),
       ),
     );
     ctrl.dispose();
+    if (result == null || !mounted) return;
+
+    try {
+      await ReviewService().createReview(
+        userId: currentUser!.id,
+        bookId: widget.bookId,
+        bookTitle: _displayTitle,
+        rating: result.rating,
+        content: result.content,
+      );
+      await loadReviews();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(_buildSnackBar('Review berhasil disimpan', color: _green));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(_buildSnackBar('Gagal: $e', color: _danger));
+    }
   }
 
   Future<void> showEditReviewDialog(Review review) async {
     final ctrl = TextEditingController(text: review.content);
     int selectedRating = review.rating;
 
-    await showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<_ReviewSheetResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (_, setSheet) => _reviewSheet(
+        builder: (sheetContext, setSheet) => _reviewSheet(
+          sheetContext: sheetContext,
           title: 'Edit Review',
           rating: selectedRating,
           controller: ctrl,
           onRatingChanged: (r) => setSheet(() => selectedRating = r),
-          onSave: () async {
-            final savedRating = selectedRating;
-            final savedContent = ctrl.text.trim();
-            Navigator.pop(ctx);
-            await Future<void>.delayed(Duration.zero);
-            if (!mounted) return;
-            try {
-              await ReviewService().updateReview(
-                id: review.id,
-                rating: savedRating,
-                content: savedContent,
-              );
-              await loadReviews();
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                _buildSnackBar('Review diperbarui', color: _green),
-              );
-            } catch (e) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                _buildSnackBar('Gagal mengupdate: $e', color: _danger),
-              );
-            }
-          },
+          onSave: () => Navigator.pop(
+            ctx,
+            _ReviewSheetResult.save(
+              rating: selectedRating,
+              content: ctrl.text.trim(),
+            ),
+          ),
           onCancel: () => Navigator.pop(ctx),
-          onDelete: () async {
-            Navigator.pop(ctx);
-            await Future<void>.delayed(Duration.zero);
-            if (!mounted) return;
-            try {
-              await ReviewService().deleteReview(review.id);
-              if (currentUser != null) {
-                final rows = await Supabase.instance.client
-                    .from('reading_list')
-                    .select('id')
-                    .eq('user_id', currentUser!.id)
-                    .eq('book_id', widget.effectiveBookId)
-                    .limit(1);
-                if (rows.isNotEmpty) {
-                  await ReadingListService().updateUserRating(
-                    id: rows.first['id'],
-                    rating: 0,
-                  );
-                }
-              }
-              await loadReviews();
-              if (!mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(_buildSnackBar('Review dihapus'));
-            } catch (e) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                _buildSnackBar('Gagal menghapus: $e', color: _danger),
-              );
-            }
-          },
+          onDelete: () => Navigator.pop(ctx, const _ReviewSheetResult.delete()),
         ),
       ),
     );
     ctrl.dispose();
+    if (result == null || !mounted) return;
+
+    if (result.delete) {
+      try {
+        await ReviewService().deleteReview(review.id);
+        if (currentUser != null) {
+          final rows = await Supabase.instance.client
+              .from('reading_list')
+              .select('id')
+              .eq('user_id', currentUser!.id)
+              .eq('book_id', widget.bookId)
+              .limit(1);
+          if (rows.isNotEmpty) {
+            await ReadingListService().updateUserRating(
+              id: rows.first['id'],
+              rating: 0,
+            );
+          }
+        }
+        await loadReviews();
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(_buildSnackBar('Review dihapus'));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(_buildSnackBar('Gagal menghapus: $e', color: _danger));
+      }
+      return;
+    }
+
+    try {
+      await ReviewService().updateReview(
+        id: review.id,
+        rating: result.rating,
+        content: result.content,
+      );
+      await loadReviews();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(_buildSnackBar('Review diperbarui', color: _green));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(_buildSnackBar('Gagal mengupdate: $e', color: _danger));
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -333,23 +392,31 @@ class _DetailBookPageState extends State<DetailBookPage>
     return null;
   }
 
+  bool get canWriteReview => currentUser != null && isFinished;
+
   Future<void> openUserReviewSheet() async {
+    if (currentUser == null) {
+      _snack('Silakan login untuk menulis review');
+      return;
+    }
+
+    if (!isFinished) {
+      _snack('Selesaikan baca buku ini dulu sebelum menulis review');
+      return;
+    }
+
     final existingReview = currentUserReview;
     if (existingReview != null) {
       await showEditReviewDialog(existingReview);
       return;
     }
 
-    if (currentUser != null) {
-      final userReviews = await ReviewService().getReviewsByUser(
-        currentUser!.id,
-      );
-      if (!mounted) return;
-      for (final review in userReviews) {
-        if (review.bookId == widget.effectiveBookId) {
-          await showEditReviewDialog(review);
-          return;
-        }
+    final userReviews = await ReviewService().getReviewsByUser(currentUser!.id);
+    if (!mounted) return;
+    for (final review in userReviews) {
+      if (review.bookId == widget.bookId) {
+        await showEditReviewDialog(review);
+        return;
       }
     }
 
@@ -372,8 +439,18 @@ class _DetailBookPageState extends State<DetailBookPage>
 
   @override
   Widget build(BuildContext context) {
+    // Selagi data buku belum ter-fetch, tampilkan loading screen
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final gap = screenHeight * 0.030;
     final ratingText = reviews.isEmpty
-        ? (widget.book?.ratingText ?? '-')
+        ? (_resolvedBook?.ratingText ?? '-')
         : averageRating.toStringAsFixed(1);
 
     return Scaffold(
@@ -384,21 +461,18 @@ class _DetailBookPageState extends State<DetailBookPage>
         opacity: _fadeAnim,
         child: CustomScrollView(
           slivers: [
-            // ── Hero cover ───────────────────────────────────────────────
             SliverToBoxAdapter(child: _buildHero(ratingText)),
-
-            // ── Body content ─────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                padding: EdgeInsets.fromLTRB(20, 0, 20, gap * 1.5),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 24),
+                    SizedBox(height: gap),
                     _buildActionButtons(),
-                    const SizedBox(height: 28),
+                    SizedBox(height: gap),
                     _buildSynopsisSection(),
-                    const SizedBox(height: 28),
+                    SizedBox(height: gap),
                     _buildReviewsSection(),
                   ],
                 ),
@@ -470,10 +544,12 @@ class _DetailBookPageState extends State<DetailBookPage>
   // ── Hero section (cover + info) ───────────────────────────────────────────
 
   Widget _buildHero(String ratingText) {
+    final screenHeight = MediaQuery.of(context).size.height;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final heroHeight = (500 + ((textScale - 1) * 260))
-        .clamp(500, 820)
-        .toDouble();
+    final heroHeight = (screenHeight * 0.52 * textScale).clamp(
+      420.0,
+      screenHeight * 0.72,
+    );
 
     return Stack(
       children: [
@@ -486,7 +562,7 @@ class _DetailBookPageState extends State<DetailBookPage>
             children: [
               // Background: blurred cover
               Image.network(
-                widget.effectiveImageUrl,
+                _displayImageUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(color: _ink),
               ),
@@ -532,7 +608,7 @@ class _DetailBookPageState extends State<DetailBookPage>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Image.network(
-                      widget.effectiveImageUrl,
+                      _displayImageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: _blueLight,
@@ -552,7 +628,7 @@ class _DetailBookPageState extends State<DetailBookPage>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
-                    widget.effectiveBookTitle,
+                    _displayTitle,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -571,7 +647,7 @@ class _DetailBookPageState extends State<DetailBookPage>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
-                    widget.effectiveBookAuthor,
+                    _displayAuthor,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.white.withOpacity(.7),
@@ -605,13 +681,12 @@ class _DetailBookPageState extends State<DetailBookPage>
                         iconColor: Colors.white70,
                         label: '${reviews.length} Review',
                       ),
-                      _metaPill(
-                        icon: Icons.layers_outlined,
-                        iconColor: Colors.white70,
-                        label: widget.effectiveEditionCount == null
-                            ? 'Open Library'
-                            : '${widget.effectiveEditionCount} Edisi',
-                      ),
+                      if (_displayEditionCount != null)
+                        _metaPill(
+                          icon: Icons.layers_outlined,
+                          iconColor: Colors.white70,
+                          label: '${_displayEditionCount} Edisi',
+                        ),
                     ],
                   ),
                 ),
@@ -718,10 +793,17 @@ class _DetailBookPageState extends State<DetailBookPage>
         const SizedBox(width: 10),
         // Review button (icon only)
         _iconActionButton(
-          icon: currentUserReview == null
+          icon: !canWriteReview
+              ? Icons.lock_outline_rounded
+              : currentUserReview == null
               ? Icons.rate_review_rounded
               : Icons.edit_outlined,
-          tooltip: currentUserReview == null ? 'Tulis Review' : 'Edit Review',
+          tooltip: !canWriteReview
+              ? 'Selesaikan baca dulu'
+              : currentUserReview == null
+              ? 'Tulis Review'
+              : 'Edit Review',
+          enabled: canWriteReview,
           onTap: openUserReviewSheet,
         ),
       ],
@@ -792,6 +874,7 @@ class _DetailBookPageState extends State<DetailBookPage>
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
+    bool enabled = true,
   }) {
     return Tooltip(
       message: tooltip,
@@ -801,7 +884,7 @@ class _DetailBookPageState extends State<DetailBookPage>
           width: 52,
           height: 52,
           decoration: BoxDecoration(
-            color: _card,
+            color: enabled ? _card : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -811,7 +894,11 @@ class _DetailBookPageState extends State<DetailBookPage>
               ),
             ],
           ),
-          child: Icon(icon, color: _blue, size: 22),
+          child: Icon(
+            icon,
+            color: enabled ? _blue : _muted.withOpacity(.65),
+            size: 22,
+          ),
         ),
       ),
     );
@@ -830,7 +917,9 @@ class _DetailBookPageState extends State<DetailBookPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader(icon: Icons.article_outlined, label: 'Sinopsis'),
+
         const SizedBox(height: 12),
+
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(18),
@@ -848,39 +937,28 @@ class _DetailBookPageState extends State<DetailBookPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (isLoadingSynopsis)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: CircularProgressIndicator(
-                      color: _blue,
-                      strokeWidth: 2,
-                    ),
+              AnimatedCrossFade(
+                firstChild: Text(
+                  shortText,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _ink.withOpacity(.75),
+                    height: 1.65,
                   ),
-                )
-              else
-                AnimatedCrossFade(
-                  firstChild: Text(
-                    shortText,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _ink.withOpacity(.75),
-                      height: 1.65,
-                    ),
-                  ),
-                  secondChild: Text(
-                    fullText,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _ink.withOpacity(.75),
-                      height: 1.65,
-                    ),
-                  ),
-                  crossFadeState: expanded
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 300),
                 ),
+                secondChild: Text(
+                  fullText,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _ink.withOpacity(.75),
+                    height: 1.65,
+                  ),
+                ),
+                crossFadeState: expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 300),
+              ),
               if (!isLoadingSynopsis && fullText.length > 200) ...[
                 const SizedBox(height: 12),
                 GestureDetector(
@@ -923,13 +1001,14 @@ class _DetailBookPageState extends State<DetailBookPage>
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            Flexible(
               child: _sectionHeader(
                 icon: Icons.star_rounded,
                 label: 'Review Pembaca',
                 iconColor: _amber,
               ),
             ),
+
             if (!isLoadingReviews && reviews.isNotEmpty)
               const SizedBox(width: 10),
             if (!isLoadingReviews && reviews.isNotEmpty)
@@ -938,10 +1017,12 @@ class _DetailBookPageState extends State<DetailBookPage>
                   horizontal: 10,
                   vertical: 4,
                 ),
+
                 decoration: BoxDecoration(
                   color: _amber.withOpacity(.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
+
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -960,19 +1041,15 @@ class _DetailBookPageState extends State<DetailBookPage>
               ),
           ],
         ),
-        const SizedBox(height: 12),
-        if (isLoadingReviews)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(color: _blue, strokeWidth: 2),
-            ),
-          )
-        else if (reviews.isEmpty)
+
+        const SizedBox(height: 16),
+
+        if (reviews.isEmpty)
           _emptyReviews()
         else
           ListView.separated(
             shrinkWrap: true,
+            padding: EdgeInsets.zero,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: reviews.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -985,7 +1062,7 @@ class _DetailBookPageState extends State<DetailBookPage>
   Widget _emptyReviews() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(18),
@@ -997,6 +1074,7 @@ class _DetailBookPageState extends State<DetailBookPage>
           ),
         ],
       ),
+
       child: Column(
         children: [
           Container(
@@ -1006,13 +1084,16 @@ class _DetailBookPageState extends State<DetailBookPage>
               color: _amber.withOpacity(.1),
               shape: BoxShape.circle,
             ),
+
             child: const Icon(
               Icons.rate_review_outlined,
               color: _amber,
               size: 26,
             ),
           ),
+
           const SizedBox(height: 12),
+
           const Text(
             'Belum ada review',
             style: TextStyle(
@@ -1021,35 +1102,46 @@ class _DetailBookPageState extends State<DetailBookPage>
               fontSize: 15,
             ),
           ),
+
           const SizedBox(height: 4),
+
           Text(
-            'Jadilah yang pertama menulis review!',
+            isFinished
+                ? 'Jadilah yang pertama menulis review!'
+                : 'Selesaikan baca buku ini dulu untuk menulis review.',
+            textAlign: TextAlign.center,
             style: TextStyle(color: _muted, fontSize: 13),
           ),
+
           const SizedBox(height: 16),
+
           GestureDetector(
             onTap: openUserReviewSheet,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_blue, _blueDark],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
+                gradient: isFinished
+                    ? const LinearGradient(
+                        colors: [_blue, _blueDark],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
+                    : null,
+                color: isFinished ? null : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: _blue.withOpacity(.3),
+                    color: (isFinished ? _blue : _muted).withOpacity(.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: const Text(
-                'Tulis Review',
+
+              child: Text(
+                isFinished ? 'Tulis Review' : 'Belum selesai dibaca',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isFinished ? Colors.white : _muted,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
@@ -1081,6 +1173,7 @@ class _DetailBookPageState extends State<DetailBookPage>
           ),
         ],
       ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1181,6 +1274,7 @@ class _DetailBookPageState extends State<DetailBookPage>
   // ── Review bottom sheet ───────────────────────────────────────────────────
 
   Widget _reviewSheet({
+    required BuildContext sheetContext,
     required String title,
     required int rating,
     required TextEditingController controller,
@@ -1198,8 +1292,9 @@ class _DetailBookPageState extends State<DetailBookPage>
         left: 24,
         right: 24,
         top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
       ),
+
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1419,7 +1514,9 @@ class _DetailBookPageState extends State<DetailBookPage>
           ),
           child: Icon(icon, color: iconColor, size: 17),
         ),
+
         const SizedBox(width: 10),
+
         Flexible(
           child: Text(
             label,

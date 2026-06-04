@@ -19,9 +19,10 @@ const _accent = Color(0xFF9E421E);
 const _card = Color(0xFFFFFFFF);
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.onCategorySelected});
+  const HomePage({super.key, this.onCategorySelected, this.isActive = false});
 
   final ValueChanged<String>? onCategorySelected;
+  final bool isActive;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -38,6 +39,14 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadUser();
     _loadBooks();
+  }
+
+  @override
+  void didUpdateWidget(HomePage old) {
+    super.didUpdateWidget(old);
+    if (widget.isActive && !old.isActive) {
+      _loadUser();
+    }
   }
 
   Future<void> _loadUser() async {
@@ -93,7 +102,7 @@ class _HomePageState extends State<HomePage> {
 
   void _toDetail(OpenLibraryBook book) => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => DetailBookPage(book: book)),
+    MaterialPageRoute(builder: (_) => DetailBookPage(bookId: book.id)),
   );
 
   void _openCategory(String category) {
