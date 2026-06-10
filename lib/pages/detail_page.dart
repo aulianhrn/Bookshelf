@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/review.dart';
 import '../models/app_user.dart';
+import '../models/open_library_book.dart';
 import '../services/open_library_service.dart';
 import '../services/review_service.dart';
 import '../services/reading_list_service.dart';
@@ -48,6 +49,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
   String? _description;
   int? _editionCount;
   int? _firstPublishYear;
+  OpenLibraryBook? _currentBook; // Objek buku untuk addToReadingList
 
   // Data dari Supabase
   List<Review> _reviews = [];
@@ -57,8 +59,12 @@ class _DetailBookPageState extends State<DetailBookPage> {
   AppUser? _currentUser;
 
   // Status buku milik user saat ini
+  bool _isInReadingList = false;
   bool _isFinished = false;
+  bool _readingListLoading = false;
   Review? _myReview; // review milik user (null = belum review)
+
+  final _readingListService = ReadingListService();
 
   // ── Inisialisasi ──────────────────────────────────────────────────────────
   @override
@@ -73,6 +79,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
       _fetchBookFromApi(),
       _fetchReviews(),
       if (_currentUser != null) _checkFinishedStatus(),
+      if (_currentUser != null) _checkReadingListStatus(),
     ]);
   }
 
@@ -87,6 +94,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
       if (!mounted) return;
       if (book != null) {
         setState(() {
+          _currentBook = book;
           _title = book.title;
           _author = book.author;
           _coverUrl = book.coverUrl;
@@ -137,12 +145,80 @@ class _DetailBookPageState extends State<DetailBookPage> {
   Future<void> _checkFinishedStatus() async {
     if (_currentUser == null) return;
     try {
-      final finished = await ReadingListService().isFinished(
+      final finished = await _readingListService.isFinished(
         userId: _currentUser!.id,
         bookId: widget.bookId,
       );
       if (mounted) setState(() => _isFinished = finished);
     } catch (_) {}
+  }
+
+  // ── Cek apakah buku ada di daftar bacaan ─────────────────────────────────
+  Future<void> _checkReadingListStatus() async {
+    if (_currentUser == null) return;
+    try {
+      final inList = await _readingListService.isInReadingList(
+        userId: _currentUser!.id,
+        bookId: widget.bookId,
+      );
+      if (mounted) setState(() => _isInReadingList = inList);
+    } catch (_) {}
+  }
+
+  // ── Toggle daftar bacaan ──────────────────────────────────────────────────
+  Future<void> _toggleReadingList() async {
+    if (_currentUser == null) return;
+    setState(() => _readingListLoading = true);
+    try {
+      if (_isInReadingList) {
+        await _readingListService.removeFromReadingList(
+          userId: _currentUser!.id,
+          bookId: widget.bookId,
+        );
+        if (mounted) {
+          setState(() {
+            _isInReadingList = false;
+            _isFinished = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Buku dihapus dari daftar bacaan.'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+      } else {
+        await _readingListService.addToReadingList(
+          userId: _currentUser!.id,
+          book: _currentBook!,
+        );
+        if (mounted) {
+          setState(() => _isInReadingList = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Buku ditambahkan ke daftar bacaan!'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: _green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal: $e'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: _red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _readingListLoading = false);
+    }
   }
 
   // ── Refresh semua data ────────────────────────────────────────────────────
@@ -155,6 +231,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
       _fetchBookFromApi(),
       _fetchReviews(),
       if (_currentUser != null) _checkFinishedStatus(),
+      if (_currentUser != null) _checkReadingListStatus(),
     ]);
   }
 
@@ -263,6 +340,16 @@ class _DetailBookPageState extends State<DetailBookPage> {
                           editionCount: _editionCount,
                           firstPublishYear: _firstPublishYear,
                         ),
+                        if (_currentUser != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                            child: _ReadingListButton(
+                              isInReadingList: _isInReadingList,
+                              isFinished: _isFinished,
+                              loading: _readingListLoading,
+                              onPressed: _currentBook != null ? _toggleReadingList : null,
+                            ),
+                          ),
                         const SizedBox(height: 4),
                         // ← Informasi Edisi dipindah ke atas Sinopsis
                         _SectionCard(
@@ -1175,6 +1262,85 @@ class _LoadingSection extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.only(top: 80),
         child: CircularProgressIndicator(color: _blue),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-widget: Tombol Daftar Bacaan
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ReadingListButton extends StatelessWidget {
+  const _ReadingListButton({
+    required this.isInReadingList,
+    required this.isFinished,
+    required this.loading,
+    required this.onPressed,
+  });
+
+  final bool isInReadingList;
+  final bool isFinished;
+  final bool loading;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    // Tentukan label & warna berdasarkan status
+    final String label;
+    final Color bgColor;
+    final Color fgColor;
+    final IconData icon;
+
+    if (isFinished) {
+      label = 'Selesai Baca';
+      bgColor = _green;
+      fgColor = Colors.white;
+      icon = Icons.check_circle_rounded;
+    } else if (isInReadingList) {
+      label = 'Hapus dari Daftar Bacaan';
+      bgColor = _red.withOpacity(.1);
+      fgColor = _red;
+      icon = Icons.bookmark_remove_rounded;
+    } else {
+      label = 'Tambah ke Daftar Bacaan';
+      bgColor = _blue;
+      fgColor = Colors.white;
+      icon = Icons.bookmark_add_rounded;
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: loading || isFinished ? null : onPressed,
+        icon: loading
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: fgColor,
+                ),
+              )
+            : Icon(icon, size: 18),
+        label: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: bgColor,
+          foregroundColor: fgColor,
+          disabledBackgroundColor: isFinished ? bgColor : bgColor.withOpacity(.5),
+          disabledForegroundColor: isFinished ? fgColor : fgColor.withOpacity(.5),
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: isInReadingList && !isFinished
+                ? BorderSide(color: _red.withOpacity(.4))
+                : BorderSide.none,
+          ),
+          elevation: 0,
+        ),
       ),
     );
   }
