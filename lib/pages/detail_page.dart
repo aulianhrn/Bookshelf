@@ -7,27 +7,6 @@ import '../services/review_service.dart';
 import '../services/reading_list_service.dart';
 import '../services/session_service.dart';
 
-// ─── Konstanta warna (sesuai tema koleksi) ─────────────────────────────────
-const _bg = Color(0xFFF4EAE1);
-const _blue = Color(0xFF2563EB);
-const _blueDark = Color(0xFF1E40AF);
-const _blueLight = Color(0xFFDBEAFE);
-const _ink = Color(0xFF1E1B4B);
-const _muted = Color(0xFF6B7280);
-const _green = Color(0xFF059669);
-const _amber = Color(0xFFF59E0B);
-const _card = Color(0xFFFFFFFF);
-const _red = Color(0xFFDC2626);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DetailBookPage
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Halaman detail buku.
-///
-/// Menerima hanya [bookId] (work key Open Library, misal "OL27516W").
-/// Semua data buku (cover, sinopsis, edisi) selalu di-fetch dari API,
-/// tidak bergantung pada data yang diteruskan dari halaman sebelumnya.
 class DetailBookPage extends StatefulWidget {
   const DetailBookPage({super.key, required this.bookId});
 
@@ -38,35 +17,30 @@ class DetailBookPage extends StatefulWidget {
 }
 
 class _DetailBookPageState extends State<DetailBookPage> {
-  // ── State ─────────────────────────────────────────────────────────────────
+
   bool _loadingBook = true;
   bool _loadingReviews = true;
 
-  // Data dari API Open Library
   String _title = '';
   String _author = '';
   String _coverUrl = '';
   String? _description;
   int? _editionCount;
   int? _firstPublishYear;
-  OpenLibraryBook? _currentBook; // Objek buku untuk addToReadingList
+  OpenLibraryBook? _currentBook;
 
-  // Data dari Supabase
   List<Review> _reviews = [];
   double _avgRating = 0;
 
-  // Session
   AppUser? _currentUser;
 
-  // Status buku milik user saat ini
   bool _isInReadingList = false;
   bool _isFinished = false;
   bool _readingListLoading = false;
-  Review? _myReview; // review milik user (null = belum review)
+  Review? _myReview;
 
   final _readingListService = ReadingListService();
 
-  // ── Inisialisasi ──────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -83,14 +57,10 @@ class _DetailBookPageState extends State<DetailBookPage> {
     ]);
   }
 
-  // ── Fetch buku dari Open Library API ─────────────────────────────────────
   Future<void> _fetchBookFromApi() async {
     try {
-      final book =
-          await OpenLibraryService.instance.fetchBookById(widget.bookId);
-      final desc = await OpenLibraryService.instance
-          .getBookDescription(widget.bookId);
-
+      final book = await OpenLibraryService.instance.fetchBookById(widget.bookId);
+      final desc = await OpenLibraryService.instance.getBookDescription(widget.bookId);
       if (!mounted) return;
       if (book != null) {
         setState(() {
@@ -111,29 +81,22 @@ class _DetailBookPageState extends State<DetailBookPage> {
     }
   }
 
-  // ── Fetch review dari Supabase ────────────────────────────────────────────
   Future<void> _fetchReviews() async {
     try {
-      final reviews =
-          await ReviewService().getReviewsByBook(widget.bookId);
+      final reviews = await ReviewService().getReviewsByBook(widget.bookId);
       if (!mounted) return;
-
       final avg = reviews.isEmpty
           ? 0.0
-          : reviews.map((r) => r.rating).reduce((a, b) => a + b) /
-              reviews.length;
-
+          : reviews.map((r) => r.rating).reduce((a, b) => a + b) / reviews.length;
       setState(() {
         _reviews = reviews;
         _avgRating = avg;
         _myReview = _currentUser == null
             ? null
-            : reviews
-                .cast<Review?>()
-                .firstWhere(
-                  (r) => r?.userId == _currentUser!.id,
-                  orElse: () => null,
-                );
+            : reviews.cast<Review?>().firstWhere(
+                (r) => r?.userId == _currentUser!.id,
+                orElse: () => null,
+              );
         _loadingReviews = false;
       });
     } catch (_) {
@@ -141,7 +104,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
     }
   }
 
-  // ── Cek apakah buku sudah selesai dibaca ─────────────────────────────────
   Future<void> _checkFinishedStatus() async {
     if (_currentUser == null) return;
     try {
@@ -153,7 +115,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
     } catch (_) {}
   }
 
-  // ── Cek apakah buku ada di daftar bacaan ─────────────────────────────────
   Future<void> _checkReadingListStatus() async {
     if (_currentUser == null) return;
     try {
@@ -165,7 +126,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
     } catch (_) {}
   }
 
-  // ── Toggle daftar bacaan ──────────────────────────────────────────────────
   Future<void> _toggleReadingList() async {
     if (_currentUser == null) return;
     setState(() => _readingListLoading = true);
@@ -200,7 +160,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
               content: const Text('Buku ditambahkan ke daftar bacaan!'),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: _green,
+              backgroundColor: const Color(0xFF059669),
             ),
           );
         }
@@ -212,7 +172,7 @@ class _DetailBookPageState extends State<DetailBookPage> {
             content: Text('Gagal: $e'),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            backgroundColor: _red,
+            backgroundColor: const Color(0xFFDC2626),
           ),
         );
       }
@@ -221,7 +181,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
     }
   }
 
-  // ── Refresh semua data ────────────────────────────────────────────────────
   Future<void> _refresh() async {
     setState(() {
       _loadingBook = true;
@@ -235,7 +194,6 @@ class _DetailBookPageState extends State<DetailBookPage> {
     ]);
   }
 
-  // ── Buka bottom sheet tulis review ───────────────────────────────────────
   Future<void> _openReviewSheet() async {
     if (!_isFinished) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -244,24 +202,21 @@ class _DetailBookPageState extends State<DetailBookPage> {
             'Selesaikan membaca buku ini terlebih dahulu untuk menulis review.',
           ),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          backgroundColor: _red,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFFDC2626),
         ),
       );
       return;
     }
 
-    int pickedRating = _myReview?.rating ?? 0;
-    final contentCtrl =
-        TextEditingController(text: _myReview?.content ?? '');
+    final contentCtrl = TextEditingController(text: _myReview?.content ?? '');
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewSheet(
-        initialRating: pickedRating,
+        initialRating: _myReview?.rating ?? 0,
         contentCtrl: contentCtrl,
         isEditing: _myReview != null,
         onSubmit: (rating, content) async {
@@ -279,17 +234,14 @@ class _DetailBookPageState extends State<DetailBookPage> {
     );
   }
 
-  // ── Hapus review ──────────────────────────────────────────────────────────
   Future<void> _deleteReview() async {
     if (_myReview == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Hapus review?'),
-        content:
-            const Text('Review kamu akan dihapus secara permanen.'),
+        content: const Text('Review kamu akan dihapus secara permanen.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -297,10 +249,9 @@ class _DetailBookPageState extends State<DetailBookPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _red,
+              backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Hapus'),
@@ -314,66 +265,667 @@ class _DetailBookPageState extends State<DetailBookPage> {
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: const Color(0xFFF4EAE1),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        color: _blue,
+        color: const Color(0xFF2563EB),
         child: CustomScrollView(
           slivers: [
-            _buildAppBar(),
+            SliverAppBar(
+              expandedHeight: 0,
+              floating: true,
+              snap: true,
+              backgroundColor: const Color(0xFFF4EAE1),
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFFFF),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF1E1B4B).withOpacity(.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: const Color(0xFF1E1B4B)),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: _loadingBook
+                  ? null
+                  : Text(
+                      _title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: const Color(0xFF1E1B4B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+            ),
+
             SliverToBoxAdapter(
               child: _loadingBook
-                  ? const _LoadingSection()
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 80),
+                        child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+                      ),
+                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _BookHero(
-                          coverUrl: _coverUrl,
-                          title: _title,
-                          author: _author,
-                          avgRating: _avgRating,
-                          reviewCount: _reviews.length,
-                          editionCount: _editionCount,
-                          firstPublishYear: _firstPublishYear,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          child: Column(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.network(
+                                  _coverUrl,
+                                  width: 140,
+                                  height: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 140,
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDBEAFE),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Icon(Icons.book_rounded,
+                                        color: Color(0xFF2563EB), size: 56),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                _title,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1E1B4B),
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _author,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  ...List.generate(5, (i) {
+                                    if (i < _avgRating.floor()) {
+                                      return const Icon(Icons.star_rounded,
+                                          color: Color(0xFFF59E0B), size: 20);
+                                    } else if (i < _avgRating) {
+                                      return const Icon(Icons.star_half_rounded,
+                                          color: Color(0xFFF59E0B), size: 20);
+                                    }
+                                    return const Icon(Icons.star_outline_rounded,
+                                        color: Color(0xFFF59E0B), size: 20);
+                                  }),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _avgRating == 0
+                                        ? 'Belum ada rating'
+                                        : '${_avgRating.toStringAsFixed(1)} (${_reviews.length} ulasan)',
+                                    style: const TextStyle(
+                                        color: Color(0xFF6B7280), fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
+
                         if (_currentUser != null)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                            child: _ReadingListButton(
-                              isInReadingList: _isInReadingList,
-                              isFinished: _isFinished,
-                              loading: _readingListLoading,
-                              onPressed: _currentBook != null ? _toggleReadingList : null,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _readingListLoading || _isFinished || _currentBook == null
+                                    ? null
+                                    : _toggleReadingList,
+                                icon: _readingListLoading
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: _isFinished
+                                              ? Colors.white
+                                              : _isInReadingList
+                                                  ? const Color(0xFFDC2626)
+                                                  : Colors.white,
+                                        ),
+                                      )
+                                    : Icon(
+                                        _isFinished
+                                            ? Icons.check_circle_rounded
+                                            : _isInReadingList
+                                                ? Icons.bookmark_remove_rounded
+                                                : Icons.bookmark_add_rounded,
+                                        size: 18,
+                                      ),
+                                label: Text(
+                                  _isFinished
+                                      ? 'Selesai Baca'
+                                      : _isInReadingList
+                                          ? 'Hapus dari Daftar Bacaan'
+                                          : 'Tambah ke Daftar Bacaan',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700, fontSize: 14),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _isFinished
+                                      ? const Color(0xFF059669)
+                                      : _isInReadingList
+                                          ? const Color(0xFFDC2626).withOpacity(.1)
+                                          : const Color(0xFF2563EB),
+                                  foregroundColor: _isFinished
+                                      ? Colors.white
+                                      : _isInReadingList
+                                          ? const Color(0xFFDC2626)
+                                          : Colors.white,
+                                  disabledBackgroundColor: _isFinished
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFF2563EB).withOpacity(.5),
+                                  disabledForegroundColor: _isFinished
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(.5),
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: _isInReadingList && !_isFinished
+                                        ? BorderSide(
+                                            color: const Color(0xFFDC2626).withOpacity(.4))
+                                        : BorderSide.none,
+                                  ),
+                                  elevation: 0,
+                                ),
+                              ),
                             ),
                           ),
+
                         const SizedBox(height: 4),
-                        // ← Informasi Edisi dipindah ke atas Sinopsis
-                        _SectionCard(
-                          title: 'Informasi Edisi',
-                          child: _EditionInfo(
-                            editionCount: _editionCount,
-                            firstPublishYear: _firstPublishYear,
+
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFFFF),
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF1E1B4B).withOpacity(.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Informasi Edisi',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E1B4B),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDBEAFE),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.layers_rounded,
+                                              color: Color(0xFF2563EB), size: 20),
+                                          const SizedBox(height: 8),
+                                          const Text('Jumlah Edisi',
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF6B7280),
+                                                  fontWeight: FontWeight.w500)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _editionCount != null
+                                                ? '$_editionCount edisi'
+                                                : '-',
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF1E1B4B),
+                                                fontWeight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDBEAFE),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.calendar_today_rounded,
+                                              color: Color(0xFF2563EB), size: 20),
+                                          const SizedBox(height: 8),
+                                          const Text('Pertama Terbit',
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF6B7280),
+                                                  fontWeight: FontWeight.w500)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _firstPublishYear != null
+                                                ? '$_firstPublishYear'
+                                                : '-',
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF1E1B4B),
+                                                fontWeight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
+
                         if (_description != null && _description!.isNotEmpty)
-                          _SectionCard(
-                            title: 'Sinopsis',
-                            child: _ExpandableText(text: _description!),
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFFFF),
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF1E1B4B).withOpacity(.04),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Sinopsis',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1E1B4B),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                _ExpandableText(text: _description!),
+                              ],
+                            ),
                           ),
-                        _ReviewsSection(
-                          reviews: _reviews,
-                          loading: _loadingReviews,
-                          currentUserId: _currentUser?.id,
-                          myReview: _myReview,
-                          isFinished: _isFinished,
-                          onWriteReview: _openReviewSheet,
-                          onDeleteReview: _deleteReview,
-                          onEditReview: _openReviewSheet,
+
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFFFF),
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF1E1B4B).withOpacity(.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Ulasan Pembaca',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1E1B4B),
+                                    ),
+                                  ),
+                                  if (_currentUser != null)
+                                    GestureDetector(
+                                      onTap: _openReviewSheet,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _isFinished
+                                              ? const Color(0xFF2563EB)
+                                              : const Color(0xFF6B7280).withOpacity(.15),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _myReview != null
+                                                  ? Icons.edit_rounded
+                                                  : Icons.rate_review_rounded,
+                                              size: 14,
+                                              color: _isFinished
+                                                  ? Colors.white
+                                                  : const Color(0xFF6B7280),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              _myReview != null
+                                                  ? 'Edit Ulasan'
+                                                  : 'Tulis Ulasan',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: _isFinished
+                                                    ? Colors.white
+                                                    : const Color(0xFF6B7280),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+
+                              if (!_isFinished && _currentUser != null) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B).withOpacity(.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: const Color(0xFFF59E0B).withOpacity(.3)),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.info_outline_rounded,
+                                          color: Color(0xFFF59E0B), size: 16),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Selesaikan membaca untuk dapat menulis ulasan.',
+                                          style: TextStyle(
+                                              fontSize: 12, color: Color(0xFFF59E0B)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 14),
+
+                              if (_myReview != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDBEAFE),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                        color: const Color(0xFF2563EB).withOpacity(.3)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const CircleAvatar(
+                                            radius: 14,
+                                            backgroundColor: Color(0xFF2563EB),
+                                            child: Icon(Icons.person_rounded,
+                                                color: Colors.white, size: 16),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      _myReview!.username ?? 'Kamu',
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 13,
+                                                        color: Color(0xFF1E1B4B),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 6, vertical: 1),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFF2563EB),
+                                                        borderRadius:
+                                                            BorderRadius.circular(8),
+                                                      ),
+                                                      child: const Text(
+                                                        'Ulasanmu',
+                                                        style: TextStyle(
+                                                            fontSize: 9,
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.w600),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                _StarRow(rating: _myReview!.rating),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuButton<String>(
+                                            onSelected: (v) {
+                                              if (v == 'edit') _openReviewSheet();
+                                              if (v == 'delete') _deleteReview();
+                                            },
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12)),
+                                            itemBuilder: (_) => const [
+                                              PopupMenuItem(
+                                                value: 'edit',
+                                                child: Row(children: [
+                                                  Icon(Icons.edit_rounded,
+                                                      size: 16, color: Color(0xFF2563EB)),
+                                                  SizedBox(width: 8),
+                                                  Text('Edit'),
+                                                ]),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'delete',
+                                                child: Row(children: [
+                                                  Icon(Icons.delete_rounded,
+                                                      size: 16, color: Color(0xFFDC2626)),
+                                                  SizedBox(width: 8),
+                                                  Text('Hapus',
+                                                      style: TextStyle(
+                                                          color: Color(0xFFDC2626))),
+                                                ]),
+                                              ),
+                                            ],
+                                            child: const Icon(Icons.more_vert_rounded,
+                                                color: Color(0xFF6B7280), size: 18),
+                                          ),
+                                        ],
+                                      ),
+                                      if (_myReview!.content != null &&
+                                          _myReview!.content!.isNotEmpty) ...[
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          _myReview!.content!,
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF1E1B4B),
+                                              height: 1.5),
+                                        ),
+                                      ],
+                                      if (_myReview!.createdAt != null) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          _formatDate(_myReview!.createdAt!),
+                                          style: const TextStyle(
+                                              fontSize: 11, color: Color(0xFF6B7280)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                if (_reviews.length > 1) ...[
+                                  const Divider(height: 24),
+                                  const Text(
+                                    'Ulasan Lainnya',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                              ],
+
+                              if (_loadingReviews)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: CircularProgressIndicator(
+                                        color: Color(0xFF2563EB)),
+                                  ),
+                                )
+                              else if (_reviews.isEmpty)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 24),
+                                    child: Text(
+                                      'Belum ada ulasan untuk buku ini.',
+                                      style: TextStyle(
+                                          color: Color(0xFF6B7280), fontSize: 14),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ..._reviews
+                                    .where((r) =>
+                                        _myReview == null || r.id != _myReview!.id)
+                                    .map(
+                                      (r) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 14),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 14,
+                                                  backgroundColor:
+                                                      const Color(0xFFDBEAFE),
+                                                  child: Text(
+                                                    (r.username?.isNotEmpty == true
+                                                            ? r.username![0]
+                                                            : '?')
+                                                        .toUpperCase(),
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Color(0xFF2563EB),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        r.username ?? 'Anonim',
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.w600,
+                                                          fontSize: 13,
+                                                          color: Color(0xFF1E1B4B),
+                                                        ),
+                                                      ),
+                                                      _StarRow(rating: r.rating),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (r.createdAt != null)
+                                                  Text(
+                                                    _formatDate(r.createdAt!),
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: Color(0xFF6B7280)),
+                                                  ),
+                                              ],
+                                            ),
+                                            if (r.content != null &&
+                                                r.content!.isNotEmpty) ...[
+                                              const SizedBox(height: 8),
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.only(left: 38),
+                                                child: Text(
+                                                  r.content!,
+                                                  style: const TextStyle(
+                                                      fontSize: 13,
+                                                      color: Color(0xFF6B7280),
+                                                      height: 1.5),
+                                                ),
+                                              ),
+                                            ],
+                                            const SizedBox(height: 8),
+                                            const Divider(height: 1),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                            ],
+                          ),
                         ),
+
                         const SizedBox(height: 32),
                       ],
                     ),
@@ -383,209 +935,8 @@ class _DetailBookPageState extends State<DetailBookPage> {
       ),
     );
   }
-
-  SliverAppBar _buildAppBar() {
-    return SliverAppBar(
-      expandedHeight: 0,
-      floating: true,
-      snap: true,
-      backgroundColor: _bg,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      leading: IconButton(
-        icon: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: _card,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: _ink.withOpacity(.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child:
-              const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: _ink),
-        ),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: _loadingBook
-          ? null
-          : Text(
-              _title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: _ink,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
-            ),
-    );
-  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Hero bagian atas
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _BookHero extends StatelessWidget {
-  const _BookHero({
-    required this.coverUrl,
-    required this.title,
-    required this.author,
-    required this.avgRating,
-    required this.reviewCount,
-    this.editionCount,
-    this.firstPublishYear,
-  });
-
-  final String coverUrl;
-  final String title;
-  final String author;
-  final double avgRating;
-  final int reviewCount;
-  final int? editionCount;
-  final int? firstPublishYear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      // color: _card dihapus → background transparan, ikut warna _bg scaffold
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      child: Column(
-        children: [
-          // Cover
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.network(
-              coverUrl,
-              width: 140,
-              height: 200,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 140,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: _blueLight,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.book_rounded, color: _blue, size: 56),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Judul
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: _ink,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 6),
-          // Penulis
-          Text(
-            author,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: _muted),
-          ),
-          const SizedBox(height: 16),
-          // Rating bar
-          _RatingBar(avg: avgRating, count: reviewCount),
-        ],
-      ),
-    );
-  }
-}
-
-class _RatingBar extends StatelessWidget {
-  const _RatingBar({required this.avg, required this.count});
-
-  final double avg;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        ...List.generate(5, (i) {
-          if (i < avg.floor()) {
-            return const Icon(Icons.star_rounded, color: _amber, size: 20);
-          } else if (i < avg) {
-            return const Icon(Icons.star_half_rounded,
-                color: _amber, size: 20);
-          }
-          return const Icon(Icons.star_outline_rounded,
-              color: _amber, size: 20);
-        }),
-        const SizedBox(width: 8),
-        Text(
-          avg == 0
-              ? 'Belum ada rating'
-              : '${avg.toStringAsFixed(1)} ($count ulasan)',
-          style: const TextStyle(color: _muted, fontSize: 13),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Section Card wrapper
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: _ink.withOpacity(.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: _ink,
-            ),
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Expandable text (sinopsis)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ExpandableText extends StatefulWidget {
   const _ExpandableText({required this.text});
@@ -611,7 +962,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
           overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
           style: const TextStyle(
             fontSize: 14,
-            color: _muted,
+            color: Color(0xFF6B7280),
             height: 1.6,
           ),
         ),
@@ -621,7 +972,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
           child: Text(
             _expanded ? 'Tampilkan lebih sedikit' : 'Selengkapnya',
             style: const TextStyle(
-              color: _blue,
+              color: Color(0xFF2563EB),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -632,459 +983,6 @@ class _ExpandableTextState extends State<_ExpandableText> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Informasi Edisi
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _EditionInfo extends StatelessWidget {
-  const _EditionInfo({this.editionCount, this.firstPublishYear});
-
-  final int? editionCount;
-  final int? firstPublishYear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _InfoTile(
-            icon: Icons.layers_rounded,
-            label: 'Jumlah Edisi',
-            value: editionCount != null ? '$editionCount edisi' : '-',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _InfoTile(
-            icon: Icons.calendar_today_rounded,
-            label: 'Pertama Terbit',
-            value: firstPublishYear != null ? '$firstPublishYear' : '-',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _blueLight,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: _blue, size: 20),
-          const SizedBox(height: 8),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11, color: _muted, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 2),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 14,
-                  color: _ink,
-                  fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Seksi Review
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ReviewsSection extends StatelessWidget {
-  const _ReviewsSection({
-    required this.reviews,
-    required this.loading,
-    required this.isFinished,
-    required this.onWriteReview,
-    required this.onDeleteReview,
-    required this.onEditReview,
-    this.currentUserId,
-    this.myReview,
-  });
-
-  final List<Review> reviews;
-  final bool loading;
-  final String? currentUserId;
-  final Review? myReview;
-  final bool isFinished;
-  final VoidCallback onWriteReview;
-  final VoidCallback onDeleteReview;
-  final VoidCallback onEditReview;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: _ink.withOpacity(.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Ulasan Pembaca',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: _ink,
-                ),
-              ),
-              if (currentUserId != null)
-                _WriteReviewButton(
-                  isFinished: isFinished,
-                  hasReview: myReview != null,
-                  onTap: onWriteReview,
-                ),
-            ],
-          ),
-
-          // Pesan jika belum selesai baca
-          if (!isFinished && currentUserId != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _amber.withOpacity(.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _amber.withOpacity(.3)),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.info_outline_rounded, color: _amber, size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Selesaikan membaca untuk dapat menulis ulasan.',
-                      style: TextStyle(fontSize: 12, color: _amber),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 14),
-
-          // Review milik user (jika ada)
-          if (myReview != null) ...[
-            _MyReviewCard(
-              review: myReview!,
-              onEdit: onEditReview,
-              onDelete: onDeleteReview,
-            ),
-            if (reviews.length > 1) ...[
-              const Divider(height: 24),
-              const Text(
-                'Ulasan Lainnya',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _muted,
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ],
-
-          // Loading
-          if (loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(color: _blue),
-              ),
-            )
-          // Kosong
-          else if (reviews.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  'Belum ada ulasan untuk buku ini.',
-                  style: TextStyle(color: _muted, fontSize: 14),
-                ),
-              ),
-            )
-          // Daftar review (exclude milik sendiri jika sudah ditampilkan)
-          else
-            ...reviews
-                .where((r) =>
-                    myReview == null || r.id != myReview!.id)
-                .map((r) => _ReviewCard(review: r)),
-        ],
-      ),
-    );
-  }
-}
-
-class _WriteReviewButton extends StatelessWidget {
-  const _WriteReviewButton({
-    required this.isFinished,
-    required this.hasReview,
-    required this.onTap,
-  });
-
-  final bool isFinished;
-  final bool hasReview;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isFinished ? _blue : _muted.withOpacity(.15),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              hasReview ? Icons.edit_rounded : Icons.rate_review_rounded,
-              size: 14,
-              color: isFinished ? Colors.white : _muted,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              hasReview ? 'Edit Ulasan' : 'Tulis Ulasan',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isFinished ? Colors.white : _muted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MyReviewCard extends StatelessWidget {
-  const _MyReviewCard({
-    required this.review,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Review review;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _blueLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _blue.withOpacity(.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 14,
-                backgroundColor: _blue,
-                child: Icon(Icons.person_rounded,
-                    color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          review.username ?? 'Kamu',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: _ink,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: _blue,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Ulasanmu',
-                            style: TextStyle(
-                                fontSize: 9,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    _StarRow(rating: review.rating),
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                onSelected: (v) {
-                  if (v == 'edit') onEdit();
-                  if (v == 'delete') onDelete();
-                },
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(children: [
-                      Icon(Icons.edit_rounded, size: 16, color: _blue),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ]),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(children: [
-                      Icon(Icons.delete_rounded, size: 16, color: _red),
-                      SizedBox(width: 8),
-                      Text('Hapus', style: TextStyle(color: _red)),
-                    ]),
-                  ),
-                ],
-                child: const Icon(Icons.more_vert_rounded,
-                    color: _muted, size: 18),
-              ),
-            ],
-          ),
-          if (review.content != null && review.content!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              review.content!,
-              style: const TextStyle(
-                  fontSize: 13, color: _ink, height: 1.5),
-            ),
-          ],
-          if (review.createdAt != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _formatDate(review.createdAt!),
-              style: const TextStyle(fontSize: 11, color: _muted),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
-
-  final Review review;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: _blueLight,
-                child: Text(
-                  (review.username?.isNotEmpty == true
-                          ? review.username![0]
-                          : '?')
-                      .toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _blue,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      review.username ?? 'Anonim',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: _ink,
-                      ),
-                    ),
-                    _StarRow(rating: review.rating),
-                  ],
-                ),
-              ),
-              if (review.createdAt != null)
-                Text(
-                  _formatDate(review.createdAt!),
-                  style: const TextStyle(fontSize: 11, color: _muted),
-                ),
-            ],
-          ),
-          if (review.content != null && review.content!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(left: 38),
-              child: Text(
-                review.content!,
-                style: const TextStyle(
-                    fontSize: 13, color: _muted, height: 1.5),
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          const Divider(height: 1),
-        ],
-      ),
-    );
-  }
-}
 
 class _StarRow extends StatelessWidget {
   const _StarRow({required this.rating});
@@ -1098,7 +996,7 @@ class _StarRow extends StatelessWidget {
         5,
         (i) => Icon(
           i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
-          color: _amber,
+          color: const Color(0xFFF59E0B),
           size: 14,
         ),
       ),
@@ -1106,9 +1004,6 @@ class _StarRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Review Bottom Sheet
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ReviewSheet extends StatefulWidget {
   const _ReviewSheet({
@@ -1147,21 +1042,20 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       decoration: const BoxDecoration(
-        color: _card,
+        color: Color(0xFFFFFFFF),
         borderRadius: BorderRadius.all(Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40,
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: _muted.withOpacity(.3),
+                color: const Color(0xFF6B7280).withOpacity(.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1169,15 +1063,16 @@ class _ReviewSheetState extends State<_ReviewSheet> {
           Text(
             widget.isEditing ? 'Edit Ulasan' : 'Tulis Ulasan',
             style: const TextStyle(
-                fontSize: 17, fontWeight: FontWeight.w800, color: _ink),
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E1B4B)),
           ),
           const SizedBox(height: 20),
-          // Bintang interaktif
           const Text('Rating',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: _muted)),
+                  color: Color(0xFF6B7280))),
           const SizedBox(height: 8),
           Row(
             children: List.generate(5, (i) {
@@ -1186,10 +1081,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                 child: Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: Icon(
-                    i < _rating
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
-                    color: _amber,
+                    i < _rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: const Color(0xFFF59E0B),
                     size: 36,
                   ),
                 ),
@@ -1197,21 +1090,20 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             }),
           ),
           const SizedBox(height: 16),
-          // Text field ulasan
           const Text('Ulasan (opsional)',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: _muted)),
+                  color: Color(0xFF6B7280))),
           const SizedBox(height: 8),
           TextField(
             controller: widget.contentCtrl,
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Ceritakan pendapatmu tentang buku ini...',
-              hintStyle: const TextStyle(color: _muted, fontSize: 13),
+              hintStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
               filled: true,
-              fillColor: _bg,
+              fillColor: const Color(0xFFF4EAE1),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -1220,26 +1112,24 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          // Tombol submit
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _rating == 0
                   ? null
-                  : () => widget.onSubmit(
-                      _rating, widget.contentCtrl.text),
+                  : () => widget.onSubmit(_rating, widget.contentCtrl.text),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _blue,
+                backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: _muted.withOpacity(.2),
+                disabledBackgroundColor: const Color(0xFF6B7280).withOpacity(.2),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
               child: Text(
                 widget.isEditing ? 'Simpan Perubahan' : 'Kirim Ulasan',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 15),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
           ),
@@ -1249,106 +1139,6 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Loading placeholder
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _LoadingSection extends StatelessWidget {
-  const _LoadingSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.only(top: 80),
-        child: CircularProgressIndicator(color: _blue),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-widget: Tombol Daftar Bacaan
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ReadingListButton extends StatelessWidget {
-  const _ReadingListButton({
-    required this.isInReadingList,
-    required this.isFinished,
-    required this.loading,
-    required this.onPressed,
-  });
-
-  final bool isInReadingList;
-  final bool isFinished;
-  final bool loading;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    // Tentukan label & warna berdasarkan status
-    final String label;
-    final Color bgColor;
-    final Color fgColor;
-    final IconData icon;
-
-    if (isFinished) {
-      label = 'Selesai Baca';
-      bgColor = _green;
-      fgColor = Colors.white;
-      icon = Icons.check_circle_rounded;
-    } else if (isInReadingList) {
-      label = 'Hapus dari Daftar Bacaan';
-      bgColor = _red.withOpacity(.1);
-      fgColor = _red;
-      icon = Icons.bookmark_remove_rounded;
-    } else {
-      label = 'Tambah ke Daftar Bacaan';
-      bgColor = _blue;
-      fgColor = Colors.white;
-      icon = Icons.bookmark_add_rounded;
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: loading || isFinished ? null : onPressed,
-        icon: loading
-            ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: fgColor,
-                ),
-              )
-            : Icon(icon, size: 18),
-        label: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          foregroundColor: fgColor,
-          disabledBackgroundColor: isFinished ? bgColor : bgColor.withOpacity(.5),
-          disabledForegroundColor: isFinished ? fgColor : fgColor.withOpacity(.5),
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: isInReadingList && !isFinished
-                ? BorderSide(color: _red.withOpacity(.4))
-                : BorderSide.none,
-          ),
-          elevation: 0,
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper
-// ─────────────────────────────────────────────────────────────────────────────
 
 String _formatDate(DateTime dt) {
   const months = [

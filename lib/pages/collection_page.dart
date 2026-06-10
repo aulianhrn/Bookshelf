@@ -16,13 +16,6 @@ const _red = Color(0xFFDC2626);
 const _amber = Color(0xFFF59E0B);
 const _card = Color(0xFFFFFFFF);
 
-class _RatingSheetResult {
-  const _RatingSheetResult({required this.rating, required this.content});
-
-  final int rating;
-  final String content;
-}
-
 class CollectionPage extends StatefulWidget {
   const CollectionPage({super.key, this.isActive = false});
   final bool isActive;
@@ -98,181 +91,6 @@ class _CollectionPageState extends State<CollectionPage>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
-
-  Future<void> _showRatingSheet(Map<String, dynamic> book) async {
-    int rating = book['user_rating'] ?? 0;
-    final ctrl = TextEditingController();
-    final result = await showModalBottomSheet<_RatingSheetResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, ss) => Container(
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          decoration: const BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.all(Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (book['cover_url'] != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        book['cover_url'],
-                        width: 40,
-                        height: 52,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.book_rounded, color: _blue),
-                      ),
-                    ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          book['book_title'] ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: _ink,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Text(
-                          book['book_author'] ?? '',
-                          style: const TextStyle(color: _muted, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Rating kamu',
-                style: TextStyle(fontWeight: FontWeight.w600, color: _ink),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: List.generate(
-                  5,
-                  (i) => GestureDetector(
-                    onTap: () => ss(() => rating = i + 1),
-                    child: Icon(
-                      i < rating
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      color: _amber,
-                      size: 38,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Komentar (opsional)',
-                style: TextStyle(fontWeight: FontWeight.w600, color: _ink),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: ctrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Tulis pendapatmu...',
-                  filled: true,
-                  fillColor: _bg,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: _blue, width: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: rating == 0
-                    ? null
-                    : () {
-                        FocusScope.of(ctx).unfocus();
-                        Navigator.pop(
-                          ctx,
-                          _RatingSheetResult(
-                            rating: rating,
-                            content: ctrl.text.trim(),
-                          ),
-                        );
-                      },
-                child: Container(
-                  width: double.infinity,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    gradient: rating == 0
-                        ? LinearGradient(
-                            colors: [
-                              _blue.withOpacity(.4),
-                              _blueDark.withOpacity(.4),
-                            ],
-                          )
-                        : const LinearGradient(colors: [_blue, _blueDark]),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Simpan Review',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    await Future<void>.delayed(Duration.zero);
-    ctrl.dispose();
-    if (result == null || !mounted) return;
-
-    try {
-      await ReadingListService().updateUserRating(
-        id: book['id'],
-        rating: result.rating,
-      );
-      await ReviewService().createReview(
-        userId: currentUser!.id,
-        bookId: book['book_id'],
-        bookTitle: book['book_title'],
-        rating: result.rating,
-        content: result.content,
-      );
-      await _load();
-      if (!mounted) return;
-      _snack('Review berhasil disimpan ✓');
-    } catch (e) {
-      if (!mounted) return;
-      _snack('Gagal: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -513,11 +331,6 @@ class _CollectionPageState extends State<CollectionPage>
     final rating = b['user_rating'] ?? 0;
     return GestureDetector(
       onTap: () async {
-        // await Navigator.push(context, MaterialPageRoute(
-        //     builder: (_) => DetailBookPage(
-        //       bookId: b['book_id'], bookTitle: b['book_title'],
-        //       bookAuthor: b['book_author'] ?? '',
-        //       imageUrl: b['cover_url'] ?? '')));
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -577,31 +390,29 @@ class _CollectionPageState extends State<CollectionPage>
                     b['book_author'] ?? '',
                     style: const TextStyle(color: _muted, fontSize: 12),
                   ),
-                  if (!isReading) ...[
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => _showRatingSheet(b),
-                      child: Row(
-                        children: [
-                          ...List.generate(
-                            5,
-                            (i) => Icon(
-                              i < rating
-                                  ? Icons.star_rounded
-                                  : Icons.star_outline_rounded,
-                              color: _amber,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            rating == 0 ? 'Beri rating' : '$rating.0',
-                            style: const TextStyle(color: _muted, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+
+                  // if (!isReading) ...[
+                  //   const SizedBox(height: 8),
+                  //   Row(
+                  //     children: [
+                  //       ...List.generate(
+                  //         5,
+                  //         (i) => Icon(
+                  //           i < rating
+                  //               ? Icons.star_rounded
+                  //               : Icons.star_outline_rounded,
+                  //           color: _amber,
+                  //           size: 16,
+                  //         ),
+                  //       ),
+                  //       const SizedBox(width: 6),
+                  //       Text(
+                  //         rating == 0 ? 'Belum dirating' : '$rating.0',
+                  //         style: const TextStyle(color: _muted, fontSize: 12),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ],
                 ],
               ),
             ),
