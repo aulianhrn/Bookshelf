@@ -209,13 +209,16 @@ class _CollectionPageState extends State<CollectionPage>
               GestureDetector(
                 onTap: rating == 0
                     ? null
-                    : () => Navigator.pop(
-                        ctx,
-                        _RatingSheetResult(
-                          rating: rating,
-                          content: ctrl.text.trim(),
-                        ),
-                      ),
+                    : () {
+                        FocusScope.of(ctx).unfocus();
+                        Navigator.pop(
+                          ctx,
+                          _RatingSheetResult(
+                            rating: rating,
+                            content: ctrl.text.trim(),
+                          ),
+                        );
+                      },
                 child: Container(
                   width: double.infinity,
                   height: 52,
@@ -246,6 +249,7 @@ class _CollectionPageState extends State<CollectionPage>
         ),
       ),
     );
+    await Future<void>.delayed(Duration.zero);
     ctrl.dispose();
     if (result == null || !mounted) return;
 

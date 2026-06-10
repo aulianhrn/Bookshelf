@@ -7,14 +7,13 @@ class ReviewService {
   Future<List<Review>> getReviewsByBook(String bookId) async {
     final rows = await _client
         .from('reviews')
-        .select(
-          'id,user_id,book_id,book_title,rating,content,created_at',
-        )
+        .select('id,user_id,book_id,book_title,rating,content,created_at')
         .eq('book_id', bookId)
         .order('created_at', ascending: false);
 
     final userIds = rows
-        .map<String>((row) => row['user_id'] as String)
+        .map<String?>((row) => row['user_id']?.toString())
+        .whereType<String>()
         .toSet()
         .toList();
     final usernames = <String, String>{};
@@ -26,8 +25,8 @@ class ReviewService {
           .inFilter('id', userIds);
 
       for (final user in users) {
-        final id = user['id'] as String?;
-        final username = user['username'] as String?;
+        final id = user['id']?.toString();
+        final username = user['username']?.toString();
         if (id != null && username != null) {
           usernames[id] = username;
         }
@@ -35,7 +34,7 @@ class ReviewService {
     }
 
     return rows.map<Review>((row) {
-      final userId = row['user_id'] as String;
+      final userId = row['user_id']?.toString();
       return Review.fromJson({...row, 'username': usernames[userId]});
     }).toList();
   }
@@ -64,10 +63,11 @@ class ReviewService {
         .eq('book_id', bookId)
         .maybeSingle();
 
+    final trimmedContent = content?.trim();
     final values = {
       'book_title': bookTitle,
       'rating': rating,
-      'content': content?.trim(),
+      'content': trimmedContent?.isEmpty == true ? null : trimmedContent,
     };
 
     if (existing == null) {
@@ -87,9 +87,13 @@ class ReviewService {
     required int rating,
     String? content,
   }) async {
+    final trimmedContent = content?.trim();
     await _client
         .from('reviews')
-        .update({'rating': rating, 'content': content?.trim()})
+        .update({
+          'rating': rating,
+          'content': trimmedContent?.isEmpty == true ? null : trimmedContent,
+        })
         .eq('id', id);
   }
 

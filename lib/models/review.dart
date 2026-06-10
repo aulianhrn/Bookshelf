@@ -21,21 +21,23 @@ class Review {
 
   factory Review.fromJson(Map<String, dynamic> json) {
     final user = json['users'];
+    final ratingValue = json['rating'];
 
     return Review(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      bookId: json['book_id'] as String,
-      bookTitle: json['book_title'] as String,
-      rating: json['rating'] as int,
-      content: json['content'] as String?,
-      username: json['username'] as String? ??
-          (user is Map<String, dynamic>
-          ? user['username'] as String?
-          : null),
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      bookId: json['book_id']?.toString() ?? '',
+      bookTitle: json['book_title']?.toString() ?? '',
+      rating: ratingValue is num
+          ? ratingValue.toInt()
+          : int.tryParse(ratingValue?.toString() ?? '') ?? 0,
+      content: json['content']?.toString(),
+      username:
+          json['username']?.toString() ??
+          (user is Map<String, dynamic> ? user['username']?.toString() : null),
       createdAt: json['created_at'] == null
           ? null
-          : DateTime.tryParse(json['created_at'] as String),
+          : DateTime.tryParse(json['created_at'].toString()),
     );
   }
 }
